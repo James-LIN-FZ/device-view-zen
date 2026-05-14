@@ -1,26 +1,48 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { TopBar } from "@/components/TopBar";
+import { DeviceList } from "@/components/DeviceList";
+import { EncodingPanel } from "@/components/EncodingPanel";
+import { NetworkPanel } from "@/components/NetworkPanel";
+import { devices } from "@/lib/devices";
 
 export const Route = createFileRoute("/")({
-  component: Index,
+  head: () => ({
+    meta: [
+      { title: "控制台 — 视频传输设备管理平台" },
+      { name: "description", content: "实时查看视频传输设备的编码状态与网络流量" },
+    ],
+  }),
+  component: Dashboard,
 });
 
-// IMPORTANT: Replace this placeholder. For sites with multiple pages (About, Services, Contact, etc.),
-// create separate route files (about.tsx, services.tsx, contact.tsx) — don't put all pages in this file.
-function PlaceholderIndex() {
+function Dashboard() {
+  const navigate = useNavigate();
+  const [selectedId, setSelectedId] = useState(devices[0].id);
+
+  useEffect(() => {
+    try {
+      if (!sessionStorage.getItem("vtx-user")) {
+        navigate({ to: "/login" });
+      }
+    } catch {}
+  }, [navigate]);
+
+  const selected = useMemo(
+    () => devices.find((d) => d.id === selectedId) ?? devices[0],
+    [selectedId],
+  );
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="h-screen flex flex-col">
+      <TopBar />
+      <div className="flex-1 min-h-0 grid gap-3 p-3" style={{ gridTemplateColumns: "1fr 3fr" }}>
+        <DeviceList devices={devices} selectedId={selectedId} onSelect={setSelectedId} />
+        <div className="grid grid-rows-2 gap-3 min-h-0">
+          <EncodingPanel device={selected} />
+          <NetworkPanel device={selected} />
+        </div>
+      </div>
     </div>
   );
-}
-
-function Index() {
-  return <PlaceholderIndex />;
 }
