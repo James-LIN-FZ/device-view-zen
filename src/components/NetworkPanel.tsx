@@ -3,6 +3,7 @@ import { Network } from "lucide-react";
 import {
   Area,
   AreaChart,
+  CartesianGrid,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -10,14 +11,8 @@ import {
 } from "recharts";
 import type { Device } from "@/lib/devices";
 
-const CHART_COLORS = [
-  "var(--color-chart-1)",
-  "var(--color-chart-2)",
-  "var(--color-chart-3)",
-  "var(--color-chart-4)",
-  "var(--color-chart-5)",
-  "var(--color-chart-6)",
-];
+const CHART_COLOR = "var(--color-primary)";
+const GRID_COLOR = "var(--color-grid-line)";
 
 const POINTS = 30;
 
