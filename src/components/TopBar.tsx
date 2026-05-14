@@ -1,17 +1,18 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Radio, LogOut, UserCircle2 } from "lucide-react";
+import { getAuthUser, logout as logoutRequest } from "@/lib/auth";
 
 export function TopBar() {
   const navigate = useNavigate();
   const [now, setNow] = useState(new Date());
-  const [user, setUser] = useState("admin");
+  const [user, setUser] = useState("-");
+  const [pending, setPending] = useState(false);
 
   useEffect(() => {
-    try {
-      const u = sessionStorage.getItem("vtx-user");
-      if (u) setUser(u);
-    } catch {}
+    const currentUser = getAuthUser();
+    if (currentUser?.username) setUser(currentUser.username);
+
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
@@ -19,8 +20,11 @@ export function TopBar() {
   const fmt = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
 
-  const logout = () => {
-    try { sessionStorage.removeItem("vtx-user"); } catch {}
+  const logout = async () => {
+    if (pending) return;
+    setPending(true);
+    await logoutRequest();
+    setPending(false);
     navigate({ to: "/login" });
   };
 
@@ -45,9 +49,10 @@ export function TopBar() {
         <span className="text-[12px]">{user}</span>
         <button
           onClick={logout}
+          disabled={pending}
           className="ml-1 inline-flex items-center gap-1 rounded-sm border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:border-primary/60 transition"
         >
-          <LogOut className="h-3 w-3" /> 退出
+          <LogOut className="h-3 w-3" /> {pending ? "退出中..." : "退出"}
         </button>
       </div>
     </header>

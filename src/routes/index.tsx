@@ -5,6 +5,7 @@ import { DeviceList } from "@/components/DeviceList";
 import { EncodingPanel } from "@/components/EncodingPanel";
 import { NetworkPanel } from "@/components/NetworkPanel";
 import { devices } from "@/lib/devices";
+import { isAuthenticated } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -22,7 +23,7 @@ function Dashboard() {
 
   useEffect(() => {
     try {
-      if (!sessionStorage.getItem("vtx-user")) {
+      if (!isAuthenticated()) {
         navigate({ to: "/login" });
       }
     } catch {}

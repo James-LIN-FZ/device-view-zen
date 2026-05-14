@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Radio, Lock, User } from "lucide-react";
+import { login } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -16,13 +17,25 @@ function LoginPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (pending) return;
+
+    setError("");
+    setPending(true);
+
     try {
-      sessionStorage.setItem("vtx-user", username || "admin");
-    } catch {}
-    navigate({ to: "/" });
+      await login(username.trim(), password);
+      navigate({ to: "/" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "登录失败，请稍后重试";
+      setError(message);
+    } finally {
+      setPending(false);
+    }
   };
 
   return (
@@ -65,15 +78,18 @@ function LoginPage() {
             </div>
           </label>
 
+          {error ? <p className="text-xs text-red-400">{error}</p> : null}
+
           <button
             type="submit"
+            disabled={pending}
             className="w-full rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground transition hover:brightness-110 glow-primary"
           >
-            登 录
+            {pending ? "登录中..." : "登 录"}
           </button>
 
           <p className="text-center text-xs text-muted-foreground pt-2">
-            演示环境 · 任意账号密码可登录
+            使用后端账号密码进行登录
           </p>
         </form>
       </div>
