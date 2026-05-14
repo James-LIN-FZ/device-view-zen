@@ -3,6 +3,7 @@ import { Network } from "lucide-react";
 import {
   Area,
   AreaChart,
+  CartesianGrid,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -10,14 +11,8 @@ import {
 } from "recharts";
 import type { Device } from "@/lib/devices";
 
-const CHART_COLORS = [
-  "var(--color-chart-1)",
-  "var(--color-chart-2)",
-  "var(--color-chart-3)",
-  "var(--color-chart-4)",
-  "var(--color-chart-5)",
-  "var(--color-chart-6)",
-];
+const CHART_COLOR = "var(--color-primary)";
+const GRID_COLOR = "var(--color-grid-line)";
 
 const POINTS = 30;
 
@@ -80,7 +75,7 @@ export function NetworkPanel({ device }: { device: Device }) {
         {device.nics.map((nic, i) => {
           const data = series[i] ?? [];
           const last = data[data.length - 1] ?? { up: 0, down: 0 };
-          const color = CHART_COLORS[i % CHART_COLORS.length];
+          const color = CHART_COLOR;
           return (
             <div
               key={nic.name}
@@ -111,12 +106,23 @@ export function NetworkPanel({ device }: { device: Device }) {
                         <stop offset="100%" stopColor={color} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <XAxis dataKey="t" hide />
+                    <CartesianGrid stroke={GRID_COLOR} strokeDasharray="0" vertical={true} horizontal={true} />
+                    <XAxis
+                      dataKey="t"
+                      tick={{ fill: "var(--color-muted-foreground)", fontSize: 9 }}
+                      tickLine={false}
+                      axisLine={{ stroke: GRID_COLOR }}
+                      tickFormatter={(v) => {
+                        const d = new Date(v as number);
+                        return `${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+                      }}
+                      minTickGap={30}
+                    />
                     <YAxis
                       width={28}
                       tick={{ fill: "var(--color-muted-foreground)", fontSize: 9 }}
                       tickLine={false}
-                      axisLine={false}
+                      axisLine={{ stroke: GRID_COLOR }}
                       domain={[0, "auto"]}
                     />
                     <Tooltip
