@@ -75,7 +75,7 @@ export function NetworkPanel({ device }: { device: Device }) {
         {device.nics.map((nic, i) => {
           const data = series[i] ?? [];
           const last = data[data.length - 1] ?? { up: 0, down: 0 };
-          const color = CHART_COLORS[i % CHART_COLORS.length];
+          const color = CHART_COLOR;
           return (
             <div
               key={nic.name}
