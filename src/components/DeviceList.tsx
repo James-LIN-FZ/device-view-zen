@@ -1,9 +1,14 @@
-import { Cpu, Wifi, WifiOff, Radio } from "lucide-react";
-import type { Device } from "@/lib/devices";
+import { Server, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const statusMap: Record<Device["status"], { label: string; cls: string; dot: string }> = {
-  streaming: { label: "推流中", cls: "text-primary", dot: "bg-primary" },
+export interface DeviceSummary {
+  id: number;
+  name: string;
+  serialNo: string;
+  online: boolean;
+}
+
+const statusMap: Record<"online" | "offline", { label: string; cls: string; dot: string }> = {
   online: { label: "在线", cls: "text-success", dot: "bg-[var(--color-success)]" },
   offline: { label: "离线", cls: "text-muted-foreground", dot: "bg-muted-foreground" },
 };
@@ -13,11 +18,11 @@ export function DeviceList({
   selectedId,
   onSelect,
 }: {
-  devices: Device[];
+  devices: DeviceSummary[];
   selectedId: string;
-  onSelect: (id: string) => void;
+  onSelect: (device: DeviceSummary, index: number) => void;
 }) {
-  const onlineCount = devices.filter((d) => d.status !== "offline").length;
+  const onlineCount = devices.filter((d) => d.online).length;
 
   return (
     <aside className="panel flex flex-col h-full overflow-hidden">
@@ -32,14 +37,14 @@ export function DeviceList({
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-        {devices.map((d) => {
-          const s = statusMap[d.status];
-          const active = d.id === selectedId;
-          const Icon = d.status === "offline" ? WifiOff : d.status === "streaming" ? Radio : Wifi;
+        {devices.map((d, index) => {
+          const s = statusMap[d.online ? "online" : "offline"];
+          const active = d.serialNo === selectedId;
+          const Icon = d.online ? Wifi : WifiOff;
           return (
             <button
               key={d.id}
-              onClick={() => onSelect(d.id)}
+              onClick={() => onSelect(d, index)}
               className={cn(
                 "w-full text-left rounded-md border px-3 py-2.5 transition flex items-center gap-3",
                 active
@@ -53,14 +58,14 @@ export function DeviceList({
                   active ? "border-primary/60 bg-primary/10" : "border-border bg-background/40",
                 )}
               >
-                <Cpu className={cn("h-4 w-4", active ? "text-primary" : "text-muted-foreground")} />
+                <Server className={cn("h-4 w-4", active ? "text-primary" : "text-muted-foreground")} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="truncate text-sm font-medium">{d.name}</span>
                 </div>
                 <div className="text-[11px] text-muted-foreground truncate">
-                  {d.model} · {d.location}
+                  {d.serialNo} · 1800x
                 </div>
               </div>
               <div className={cn("flex items-center gap-1.5 text-[11px]", s.cls)}>
