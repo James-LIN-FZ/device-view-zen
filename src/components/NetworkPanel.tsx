@@ -106,12 +106,23 @@ export function NetworkPanel({ device }: { device: Device }) {
                         <stop offset="100%" stopColor={color} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <XAxis dataKey="t" hide />
+                    <CartesianGrid stroke={GRID_COLOR} strokeDasharray="0" vertical={true} horizontal={true} />
+                    <XAxis
+                      dataKey="t"
+                      tick={{ fill: "var(--color-muted-foreground)", fontSize: 9 }}
+                      tickLine={false}
+                      axisLine={{ stroke: GRID_COLOR }}
+                      tickFormatter={(v) => {
+                        const d = new Date(v as number);
+                        return `${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+                      }}
+                      minTickGap={30}
+                    />
                     <YAxis
                       width={28}
                       tick={{ fill: "var(--color-muted-foreground)", fontSize: 9 }}
                       tickLine={false}
-                      axisLine={false}
+                      axisLine={{ stroke: GRID_COLOR }}
                       domain={[0, "auto"]}
                     />
                     <Tooltip
