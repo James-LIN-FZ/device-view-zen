@@ -5,7 +5,7 @@ import { DeviceList } from "@/components/DeviceList";
 import { EncodingPanel } from "@/components/EncodingPanel";
 import { NetworkPanel } from "@/components/NetworkPanel";
 import { isAuthenticated } from "@/lib/auth";
-import { fetchMyDevices, type BackendDevice } from "@/lib/device-api";
+import { fetchMyDevices, updateDeviceName, type BackendDevice } from "@/lib/device-api";
 import { devices as demoDevices } from "@/lib/devices";
 
 export const Route = createFileRoute("/")({
@@ -83,6 +83,24 @@ function Dashboard() {
               onSelect={(device, index) => {
                 setSelectedId(device.serialNo);
                 setSelectedDemoIndex(index % demoDevices.length);
+              }}
+              onRename={async (device, nextName) => {
+                try {
+                  await updateDeviceName(device.serialNo, nextName);
+                  setDevices((current) =>
+                    current.map((item) =>
+                      item.serialNo === device.serialNo ? { ...item, name: nextName } : item,
+                    ),
+                  );
+                } catch (err) {
+                  const message = err instanceof Error ? err.message : "更新设备名称失败";
+                  if (message === "unauthorized") {
+                    navigate({ to: "/login" });
+                    return;
+                  }
+                  setError(message);
+                  throw err;
+                }
               }}
             />
           </div>

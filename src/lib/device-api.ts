@@ -41,8 +41,39 @@ export async function fetchMyDevices(): Promise<BackendDevice[]> {
 
   return payload.map((device) => ({
     id: device.id,
-    name: device.name?.trim() || `设备 ${device.serialNo}`,
+    name: device.name?.trim() || "",
     serialNo: device.serialNo,
     online: device.online,
   }));
+}
+
+export async function updateDeviceName(serialNo: string, name: string): Promise<void> {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error("missing auth token");
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/api/devices/${encodeURIComponent(serialNo)}/name`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name }),
+  });
+
+  if (response.status === 401) {
+    throw new Error("unauthorized");
+  }
+
+  if (!response.ok) {
+    let message = "更新设备名称失败";
+    try {
+      const body = (await response.json()) as { error?: string };
+      if (body.error) message = body.error;
+    } catch {
+      // Keep fallback message.
+    }
+    throw new Error(message);
+  }
 }
