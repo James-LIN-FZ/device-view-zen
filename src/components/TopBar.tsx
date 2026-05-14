@@ -25,29 +25,29 @@ export function TopBar() {
   };
 
   return (
-    <header className="h-14 shrink-0 border-b border-border bg-panel/80 backdrop-blur flex items-center px-5 gap-6">
-      <div className="flex items-center gap-2.5">
-        <div className="h-8 w-8 rounded-md bg-primary/15 border border-primary/40 flex items-center justify-center">
-          <Radio className="h-4 w-4 text-primary" />
+    <header className="h-12 shrink-0 border-b border-border bg-panel flex items-center px-4 gap-5">
+      <div className="flex items-center gap-2">
+        <div className="h-7 w-7 rounded-sm bg-primary/15 border border-primary/50 flex items-center justify-center">
+          <Radio className="h-3.5 w-3.5 text-primary" />
         </div>
         <div className="leading-tight">
-          <div className="text-sm font-semibold tracking-wide">VTX Console</div>
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">视频传输设备管理平台</div>
+          <div className="text-[13px] font-semibold tracking-wide text-primary">VTX Console</div>
+          <div className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground">视频传输设备管理平台</div>
         </div>
       </div>
 
       <div className="flex-1" />
 
-      <div className="font-mono text-sm text-muted-foreground tabular-nums">{fmt(now)}</div>
+      <div className="font-mono text-[12px] text-muted-foreground tabular-nums">{fmt(now)}</div>
 
-      <div className="flex items-center gap-3 pl-4 border-l border-border">
-        <UserCircle2 className="h-5 w-5 text-primary" />
-        <span className="text-sm">{user}</span>
+      <div className="flex items-center gap-2 pl-4 border-l border-border">
+        <UserCircle2 className="h-4 w-4 text-primary" />
+        <span className="text-[12px]">{user}</span>
         <button
           onClick={logout}
-          className="ml-2 inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-primary/60 transition"
+          className="ml-1 inline-flex items-center gap-1 rounded-sm border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:border-primary/60 transition"
         >
-          <LogOut className="h-3.5 w-3.5" /> 退出
+          <LogOut className="h-3 w-3" /> 退出
         </button>
       </div>
     </header>

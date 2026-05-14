@@ -36,9 +36,9 @@ function Dashboard() {
   return (
     <div className="h-screen flex flex-col">
       <TopBar />
-      <div className="flex-1 min-h-0 grid gap-3 p-3" style={{ gridTemplateColumns: "1fr 3fr" }}>
+      <div className="flex-1 min-h-0 grid gap-2 p-2" style={{ gridTemplateColumns: "1fr 3fr" }}>
         <DeviceList devices={devices} selectedId={selectedId} onSelect={setSelectedId} />
-        <div className="grid grid-rows-2 gap-3 min-h-0">
+        <div className="grid grid-rows-2 gap-2 min-h-0">
           <EncodingPanel device={selected} />
           <NetworkPanel device={selected} />
         </div>
