@@ -2,8 +2,10 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { TopBar } from "@/components/TopBar";
 import { DeviceList } from "@/components/DeviceList";
+import { ViewSwitcher, type ViewKey } from "@/components/ViewSwitcher";
 import { EncodingPanel } from "@/components/EncodingPanel";
 import { NetworkPanel } from "@/components/NetworkPanel";
+import { UserManagementView } from "@/components/UserManagementView";
 import { isAuthenticated } from "@/lib/auth";
 import { fetchDeviceStatus, fetchMyDevices, updateDeviceName, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
 
@@ -24,6 +26,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deviceStatus, setDeviceStatus] = useState<BackendDeviceStatusData | null>(null);
+  const [activeView, setActiveView] = useState<ViewKey>("control");
 
   const selectedDevice = useMemo(
     () => devices.find((device) => device.serialNo === selectedId) ?? null,
@@ -94,53 +97,68 @@ function Dashboard() {
   return (
     <div className="h-screen flex flex-col">
       <TopBar />
-      <div className="flex-1 min-h-0 grid gap-2 p-2" style={{ gridTemplateColumns: "1fr 3fr" }}>
-        <div className="flex flex-col min-h-0 gap-2">
-          {error ? (
-            <div className="panel border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-              {error}
-            </div>
-          ) : null}
-          <div className="flex-1 min-h-0">
-            <DeviceList
-              devices={devices}
-              selectedId={selectedId}
-              onSelect={(device) => {
-                setSelectedId(device.serialNo);
-              }}
-              onRename={async (device, nextName) => {
-                try {
-                  await updateDeviceName(device.serialNo, nextName);
-                  setDevices((current) =>
-                    current.map((item) =>
-                      item.serialNo === device.serialNo ? { ...item, name: nextName } : item,
-                    ),
-                  );
-                } catch (err) {
-                  const message = err instanceof Error ? err.message : "更新设备名称失败";
-                  if (message === "unauthorized") {
-                    navigate({ to: "/login" });
-                    return;
-                  }
-                  setError(message);
-                  throw err;
-                }
-              }}
-            />
+      <div className="flex-1 min-h-0 grid gap-2 p-2" style={{ gridTemplateColumns: "auto 1fr 3fr" }}>
+        <ViewSwitcher active={activeView} onChange={setActiveView} />
+        {activeView === "users" ? (
+          <div className="col-span-2 min-h-0">
+            <UserManagementView onUnauthorized={() => navigate({ to: "/login" })} />
           </div>
-          {loading ? <div className="text-xs text-muted-foreground px-2">加载设备中...</div> : null}
-        </div>
-        <div className="grid grid-rows-2 gap-2 min-h-0">
-          <EncodingPanel
-            deviceName={selectedDevice?.name?.trim() || "未命名设备"}
-            online={selectedDevice?.online ?? false}
-            status={deviceStatus}
-          />
-          <NetworkPanel
-            serialNo={selectedId}
-            online={selectedDevice?.online ?? false}
-          />
-        </div>
+        ) : (
+          <>
+            <div className="flex flex-col min-h-0 gap-2">
+              {error ? (
+                <div className="panel border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  {error}
+                </div>
+              ) : null}
+              <div className="flex-1 min-h-0">
+                <DeviceList
+                  devices={devices}
+                  selectedId={selectedId}
+                  onSelect={(device) => {
+                    setSelectedId(device.serialNo);
+                  }}
+                  onRename={async (device, nextName) => {
+                    try {
+                      await updateDeviceName(device.serialNo, nextName);
+                      setDevices((current) =>
+                        current.map((item) =>
+                          item.serialNo === device.serialNo ? { ...item, name: nextName } : item,
+                        ),
+                      );
+                    } catch (err) {
+                      const message = err instanceof Error ? err.message : "更新设备名称失败";
+                      if (message === "unauthorized") {
+                        navigate({ to: "/login" });
+                        return;
+                      }
+                      setError(message);
+                      throw err;
+                    }
+                  }}
+                />
+              </div>
+              {loading ? <div className="text-xs text-muted-foreground px-2">加载设备中...</div> : null}
+            </div>
+            <div className="grid grid-rows-2 gap-2 min-h-0">
+              {activeView === "control" ? (
+                <EncodingPanel
+                  deviceName={selectedDevice?.name?.trim() || "未命名设备"}
+                  online={selectedDevice?.online ?? false}
+                  status={deviceStatus}
+                />
+              ) : (
+                <div className="panel flex items-center justify-center text-sm text-muted-foreground">
+                  监看视图 — 即将上线
+                </div>
+              )}
+              <NetworkPanel
+                serialNo={selectedId}
+                online={selectedDevice?.online ?? false}
+              />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
