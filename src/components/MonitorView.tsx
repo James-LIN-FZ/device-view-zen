@@ -120,7 +120,7 @@ export function MonitorView({ devices }: { devices: BackendDevice[] }) {
           从左侧设备列表拖拽设备到监看位 · {slots.filter(Boolean).length} / {SLOT_COUNT}
         </span>
       </div>
-      <div className="flex-1 grid grid-cols-4 grid-rows-2 gap-2 p-2 min-h-0">
+      <div className="flex-1 grid grid-cols-2 grid-rows-4 gap-2 p-2 min-h-0">
         {slots.map((sn, i) => {
           const device = sn ? deviceMap.get(sn) ?? null : null;
           return (
