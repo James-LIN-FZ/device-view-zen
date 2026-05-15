@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { TopBar } from "@/components/TopBar";
 import { DeviceList } from "@/components/DeviceList";
+import { ViewSwitcher, type ViewKey } from "@/components/ViewSwitcher";
 import { EncodingPanel } from "@/components/EncodingPanel";
 import { NetworkPanel } from "@/components/NetworkPanel";
 import { isAuthenticated } from "@/lib/auth";
@@ -26,6 +27,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deviceStatus, setDeviceStatus] = useState<BackendDeviceStatusData | null>(null);
+  const [activeView, setActiveView] = useState<ViewKey>("control");
 
   const selectedDevice = useMemo(
     () => devices.find((device) => device.serialNo === selectedId) ?? null,
@@ -102,7 +104,7 @@ function Dashboard() {
   return (
     <div className="h-screen flex flex-col">
       <TopBar />
-      <div className="flex-1 min-h-0 grid gap-2 p-2" style={{ gridTemplateColumns: "1fr 3fr" }}>
+      <div className="flex-1 min-h-0 grid gap-2 p-2" style={{ gridTemplateColumns: "1fr 3fr auto" }}>
         <div className="flex flex-col min-h-0 gap-2">
           {error ? (
             <div className="panel border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
@@ -147,6 +149,7 @@ function Dashboard() {
           />
           <NetworkPanel device={selected} />
         </div>
+        <ViewSwitcher active={activeView} onChange={setActiveView} />
       </div>
     </div>
   );
