@@ -27,6 +27,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deviceStatus, setDeviceStatus] = useState<BackendDeviceStatusData | null>(null);
+  const [activeView, setActiveView] = useState<ViewKey>("control");
 
   const selectedDevice = useMemo(
     () => devices.find((device) => device.serialNo === selectedId) ?? null,
