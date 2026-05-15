@@ -11,6 +11,7 @@ const CHART_COLOR = "var(--color-primary)";
 const GRID_COLOR = "var(--color-grid-line)";
 
 type Sample = { t: number; up: number; down: number };
+type QualitySample = { t: number; rtt: number; loss: number };
 
 function getWsBaseUrl(): string {
   const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
