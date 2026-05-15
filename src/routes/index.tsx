@@ -150,7 +150,6 @@ function Dashboard() {
           />
           <NetworkPanel device={selected} />
         </div>
-        <ViewSwitcher active={activeView} onChange={setActiveView} />
       </div>
     </div>
   );
