@@ -104,6 +104,12 @@ export function DeviceList({
               key={d.id}
               role="button"
               tabIndex={0}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData("text/plain", d.serialNo);
+                e.dataTransfer.setData("application/x-device-sn", d.serialNo);
+                e.dataTransfer.effectAllowed = "copy";
+              }}
               onClick={() => onSelect(d, index)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {

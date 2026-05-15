@@ -6,6 +6,7 @@ import { ViewSwitcher, type ViewKey } from "@/components/ViewSwitcher";
 import { EncodingPanel } from "@/components/EncodingPanel";
 import { NetworkPanel } from "@/components/NetworkPanel";
 import { UserManagementView } from "@/components/UserManagementView";
+import { MonitorView } from "@/components/MonitorView";
 import { isAuthenticated } from "@/lib/auth";
 import { fetchDeviceStatus, fetchMyDevices, updateDeviceName, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
 
@@ -142,20 +143,22 @@ function Dashboard() {
             </div>
             <div className="grid grid-rows-2 gap-2 min-h-0">
               {activeView === "control" ? (
-                <EncodingPanel
-                  deviceName={selectedDevice?.name?.trim() || "未命名设备"}
-                  online={selectedDevice?.online ?? false}
-                  status={deviceStatus}
-                />
+                <>
+                  <EncodingPanel
+                    deviceName={selectedDevice?.name?.trim() || "未命名设备"}
+                    online={selectedDevice?.online ?? false}
+                    status={deviceStatus}
+                  />
+                  <NetworkPanel
+                    serialNo={selectedId}
+                    online={selectedDevice?.online ?? false}
+                  />
+                </>
               ) : (
-                <div className="panel flex items-center justify-center text-sm text-muted-foreground">
-                  监看视图 — 即将上线
+                <div className="row-span-2 min-h-0">
+                  <MonitorView devices={devices} />
                 </div>
               )}
-              <NetworkPanel
-                serialNo={selectedId}
-                online={selectedDevice?.online ?? false}
-              />
             </div>
           </>
         )}
