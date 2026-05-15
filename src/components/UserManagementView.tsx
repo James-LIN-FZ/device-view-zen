@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, KeyRound, Link2, Link2Off, ShieldCheck, User as UserIcon, RefreshCw } from "lucide-react";
+import { Plus, Trash2, KeyRound, Link2, Link2Off, ShieldCheck, User as UserIcon, RefreshCw, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -295,10 +295,74 @@ function BindingsTable({
   isAdmin: boolean;
   onUnbind: (b: DeviceBinding) => void;
 }) {
+  const [filter, setFilter] = useState("");
+  const [userFilter, setUserFilter] = useState<string>("all");
+
+  const usernames = useMemo(
+    () => Array.from(new Set(bindings.map((b) => b.username))).sort(),
+    [bindings],
+  );
+
+  const filtered = useMemo(() => {
+    const kw = filter.trim().toLowerCase();
+    return bindings.filter((b) => {
+      if (userFilter !== "all" && b.username !== userFilter) return false;
+      if (!kw) return true;
+      return (
+        b.serialNo.toLowerCase().includes(kw) ||
+        (b.deviceName ?? "").toLowerCase().includes(kw) ||
+        b.username.toLowerCase().includes(kw)
+      );
+    });
+  }, [bindings, filter, userFilter]);
+
   return (
     <div className="panel flex flex-col min-h-0">
-      <div className="px-3 py-2 border-b text-xs text-muted-foreground">
-        {isAdmin ? `所有设备绑定记录（${bindings.length}）` : `我绑定的设备（${bindings.length}）`}
+      <div className="px-3 py-2 border-b flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground">
+          {isAdmin
+            ? `所有设备绑定记录（${filtered.length}/${bindings.length}）`
+            : `我绑定的设备（${filtered.length}/${bindings.length}）`}
+        </span>
+        <div className="flex items-center gap-2">
+          {isAdmin ? (
+            <Select value={userFilter} onValueChange={setUserFilter}>
+              <SelectTrigger className="h-7 w-32 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部用户</SelectItem>
+                {usernames.map((u) => (
+                  <SelectItem key={u} value={u}>
+                    {u}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
+          <div className="relative">
+            <Search
+              size={12}
+              className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="搜索序列号 / 设备名"
+              className="h-7 w-48 pl-6 pr-6 text-xs"
+            />
+            {filter ? (
+              <button
+                type="button"
+                onClick={() => setFilter("")}
+                className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                title="清除"
+              >
+                <X size={12} />
+              </button>
+            ) : null}
+          </div>
+        </div>
       </div>
       <div className="flex-1 min-h-0 overflow-auto">
         <table className="w-full text-sm">
@@ -311,7 +375,7 @@ function BindingsTable({
             </tr>
           </thead>
           <tbody>
-            {bindings.map((b) => (
+            {filtered.map((b) => (
               <tr key={b.id} className="border-b hover:bg-secondary/40">
                 {isAdmin ? <td className="px-3 py-2">{b.username}</td> : null}
                 <td className="px-3 py-2 font-mono text-xs">{b.serialNo}</td>
@@ -327,13 +391,13 @@ function BindingsTable({
                 ) : null}
               </tr>
             ))}
-            {bindings.length === 0 ? (
+            {filtered.length === 0 ? (
               <tr>
                 <td
                   colSpan={isAdmin ? 4 : 3}
                   className="px-3 py-6 text-center text-xs text-muted-foreground"
                 >
-                  暂无绑定记录
+                  {bindings.length === 0 ? "暂无绑定记录" : "未匹配到结果"}
                 </td>
               </tr>
             ) : null}
