@@ -6,6 +6,7 @@ import { ViewSwitcher, type ViewKey } from "@/components/ViewSwitcher";
 import { EncodingPanel } from "@/components/EncodingPanel";
 import { NetworkPanel } from "@/components/NetworkPanel";
 import { UserManagementView } from "@/components/UserManagementView";
+import { MonitorView } from "@/components/MonitorView";
 import { isAuthenticated } from "@/lib/auth";
 import { fetchDeviceStatus, fetchMyDevices, updateDeviceName, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
 
