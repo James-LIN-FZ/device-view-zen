@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Activity, Video, Settings2, Save, RotateCcw } from "lucide-react";
+import { Activity, Video, Settings2, Save, Play, Square, RefreshCw } from "lucide-react";
 import type { BackendDeviceStatusData } from "@/lib/device-api";
 
-const VIDEO_SOURCES = ["SDI-1", "SDI-2", "HDMI-1", "HDMI-2", "NDI", "USB"];
-const VIDEO_CODECS = ["H.264 / AVC", "H.265 / HEVC", "AV1"];
-const AUDIO_CODECS = ["AAC-LC 48kHz", "AAC-HE 48kHz", "Opus 48kHz", "MP3 44.1kHz"];
-const RESOLUTIONS = ["3840 × 2160", "1920 × 1080", "1280 × 720", "854 × 480"];
-const FRAMERATES = ["24 fps", "25 fps", "30 fps", "50 fps", "60 fps"];
+const ENCODE_TASKS = [
+  "直播推流 - 主任务",
+  "录制存档 - 本地",
+  "低延迟回传",
+  "多码率转码",
+  "应急备播",
+];
 
 type EncodingForm = {
   videoSource: string;
@@ -124,18 +126,26 @@ export function EncodingPanel({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [form, setForm] = useState<EncodingForm>(() => buildForm(status));
   const [bitrateNum, setBitrateNum] = useState(() => parseVideoBitrate(status) || 8);
+  const [latency, setLatency] = useState(500);
+  const [task, setTask] = useState(ENCODE_TASKS[0]);
+  const [running, setRunning] = useState(false);
+  const [localRecordingEnabled, setLocalRecordingEnabled] = useState(false);
   const [dirty, setDirty] = useState(false);
+
+  const resetEditPanel = () => {
+    setLatency(500);
+    setBitrateNum(parseVideoBitrate(status) || 8);
+    setTask(ENCODE_TASKS[0]);
+    setRunning(false);
+    setLocalRecordingEnabled(false);
+    setDirty(false);
+  };
 
   useEffect(() => {
     setForm(buildForm(status));
     setBitrateNum(parseVideoBitrate(status) || 8);
     setDirty(false);
   }, [status]);
-
-  const update = <K extends keyof EncodingForm>(k: K, v: string) => {
-    setForm((f) => ({ ...f, [k]: v }));
-    setDirty(true);
-  };
 
   // Faux live preview
   useEffect(() => {
@@ -198,6 +208,12 @@ export function EncodingPanel({
   }, [online, deviceName]);
 
   const live = online;
+  const realtimeBitrate = status?.sVideoCodec?.sActBitrate || "--";
+  const realtimeFramerate = status?.sVideoCodec?.iActBitrate != null
+    ? String(status.sVideoCodec.iActBitrate)
+    : "--";
+  const audioSource = status?.sAudioParams?.sDevice || "--";
+  const localRecording = "--";
 
   return (
     <section className="panel flex flex-col h-full overflow-hidden">
@@ -241,10 +257,12 @@ export function EncodingPanel({
           <dl className="divide-y divide-border text-[11px]">
             <Row k="视频源" v={form.videoSource} />
             <Row k="视频编码" v={form.videoCodec} />
+            <Row k="音频源" v={audioSource} />
             <Row k="音频编码" v={form.audioCodec} />
-            <Row k="分辨率" v={form.resolution} />
-            <Row k="码率" v={`${bitrateNum} Mbps`} highlight />
-            <Row k="帧率" v={form.framerate} highlight />
+            <Row k="编码分辨率" v={form.resolution} />
+            <Row k="实时码率" v={realtimeBitrate} highlight />
+            <Row k="实时帧率" v={realtimeFramerate} highlight />
+            <Row k="本地录制" v={localRecording} />
             <Row k="推流地址" v={form.streamUrl} mono />
           </dl>
         </div>
@@ -254,60 +272,101 @@ export function EncodingPanel({
           <div className="px-2.5 py-1.5 border-b border-border flex items-center gap-1.5 bg-background/30">
             <Settings2 className="h-3 w-3 text-primary" />
             <span className="text-[11px] font-medium tracking-wide uppercase">参数修改</span>
-            {dirty && <span className="ml-auto text-[10px] text-warning">未保存</span>}
+            <div className="ml-auto flex items-center gap-1.5">
+              {dirty && <span className="text-[10px] text-warning">未保存</span>}
+              <button
+                type="button"
+                onClick={resetEditPanel}
+                className="inline-flex items-center justify-center rounded-sm border border-border bg-secondary/30 p-1 text-muted-foreground hover:border-primary/50 hover:text-primary transition"
+                title="刷新"
+                aria-label="刷新"
+              >
+                <RefreshCw className="h-3 w-3" />
+              </button>
+            </div>
           </div>
-          <div className="p-2.5 space-y-2 text-[11px]">
-            <Field label="视频源">
-              <Select value={form.videoSource} onChange={(v) => update("videoSource", v)} options={VIDEO_SOURCES} />
-            </Field>
-            <Field label="视频编码">
-              <Select value={form.videoCodec} onChange={(v) => update("videoCodec", v)} options={VIDEO_CODECS} />
-            </Field>
-            <Field label="音频编码">
-              <Select value={form.audioCodec} onChange={(v) => update("audioCodec", v)} options={AUDIO_CODECS} />
-            </Field>
-            <Field label="分辨率">
-              <Select value={form.resolution} onChange={(v) => update("resolution", v)} options={RESOLUTIONS} />
-            </Field>
-            <Field label="帧率">
-              <Select value={form.framerate} onChange={(v) => update("framerate", v)} options={FRAMERATES} />
-            </Field>
-            <Field label={`码率 ${bitrateNum} Mbps`}>
-              <input
-                type="range"
-                min={1}
-                max={50}
-                value={bitrateNum}
-                onChange={(e) => { setBitrateNum(+e.target.value); setDirty(true); }}
-                className="w-full accent-[var(--color-primary)]"
-                disabled={!online}
-              />
-              <div className="flex justify-between text-[9px] text-muted-foreground mt-0.5">
-                <span>1</span><span>25</span><span>50</span>
+          <div className="p-2.5 space-y-3 text-[11px]">
+            <Field label="延迟设置 (ms)">
+              <div className="flex items-center gap-2">
+                <input
+                  type="range"
+                  min={100}
+                  max={5000}
+                  step={50}
+                  value={latency}
+                  onChange={(e) => { setLatency(+e.target.value); setDirty(true); }}
+                  className="flex-1 accent-[var(--color-primary)]"
+                  disabled={!online}
+                />
+                <input
+                  type="number"
+                  min={100}
+                  max={5000}
+                  step={50}
+                  value={latency}
+                  onChange={(e) => { setLatency(+e.target.value); setDirty(true); }}
+                  className="w-16 bg-input border border-border rounded-sm px-1.5 py-0.5 text-[11px] text-right focus:outline-none focus:border-primary"
+                  disabled={!online}
+                />
               </div>
             </Field>
-            <Field label="推流地址">
-              <input
-                type="text"
-                value={form.streamUrl}
-                onChange={(e) => update("streamUrl", e.target.value)}
-                className="w-full bg-input border border-border rounded-sm px-2 py-1 font-mono text-[10px] focus:outline-none focus:border-primary"
-              />
+            <Field label="码率 (Mbps)">
+              <div className="flex items-center gap-2">
+                <input
+                  type="range"
+                  min={1}
+                  max={50}
+                  value={bitrateNum}
+                  onChange={(e) => { setBitrateNum(+e.target.value); setDirty(true); }}
+                  className="flex-1 accent-[var(--color-primary)]"
+                  disabled={!online}
+                />
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={bitrateNum}
+                  onChange={(e) => { setBitrateNum(+e.target.value); setDirty(true); }}
+                  className="w-16 bg-input border border-border rounded-sm px-1.5 py-0.5 text-[11px] text-right focus:outline-none focus:border-primary"
+                  disabled={!online}
+                />
+              </div>
             </Field>
-          </div>
-          <div className="mt-auto p-2 border-t border-border flex gap-1.5 bg-background/30">
-            <button
-              onClick={() => { setForm(buildForm(status)); setBitrateNum(parseVideoBitrate(status) || 8); setDirty(false); }}
-              className="flex-1 inline-flex items-center justify-center gap-1 rounded-sm border border-border bg-secondary/40 px-2 py-1.5 text-[11px] hover:border-primary/50 transition"
-            >
-              <RotateCcw className="h-3 w-3" /> 重置
-            </button>
+            <Field label="本地录制开关">
+              <button
+                type="button"
+                onClick={() => { setLocalRecordingEnabled((v) => !v); setDirty(true); }}
+                className={`w-full inline-flex items-center justify-between rounded-sm border px-2 py-1.5 text-[11px] transition ${
+                  localRecordingEnabled
+                    ? "border-primary/50 bg-primary/10 text-primary"
+                    : "border-border bg-secondary/30 text-muted-foreground"
+                }`}
+                disabled={!online}
+              >
+                <span>本地录制</span>
+                <span className="font-medium">{localRecordingEnabled ? "开启" : "关闭"}</span>
+              </button>
+            </Field>
             <button
               onClick={() => setDirty(false)}
               disabled={!dirty}
-              className="flex-1 inline-flex items-center justify-center gap-1 rounded-sm bg-primary text-primary-foreground px-2 py-1.5 text-[11px] font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              className="w-full inline-flex items-center justify-center gap-1 rounded-sm bg-primary text-primary-foreground px-2 py-1.5 text-[11px] font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               <Save className="h-3 w-3" /> 应用
+            </button>
+            <Field label="编码任务">
+              <Select value={task} onChange={(v) => { setTask(v); setDirty(true); }} options={ENCODE_TASKS} />
+            </Field>
+            <button
+              onClick={() => setRunning((r) => !r)}
+              disabled={!online}
+              className={`w-full inline-flex items-center justify-center gap-1.5 rounded-sm px-2 py-2 text-[11px] font-medium transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                running
+                  ? "bg-destructive/15 text-destructive border border-destructive/40 hover:bg-destructive/25"
+                  : "bg-primary/15 text-primary border border-primary/40 hover:bg-primary/25"
+              }`}
+            >
+              {running ? <><Square className="h-3 w-3" /> 停止任务</> : <><Play className="h-3 w-3" /> 开始任务</>}
             </button>
           </div>
         </div>

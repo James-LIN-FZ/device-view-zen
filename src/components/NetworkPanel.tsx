@@ -15,6 +15,7 @@ const CHART_COLOR = "var(--color-primary)";
 const GRID_COLOR = "var(--color-grid-line)";
 
 const POINTS = 30;
+const DISPLAY_NIC_COUNT = 8;
 
 type Sample = { t: number; up: number; down: number };
 
@@ -29,29 +30,39 @@ function makeInitial(): Sample[] {
 
 export function NetworkPanel({ device }: { device: Device }) {
   const offline = device.status === "offline";
+  const displayNics = Array.from({ length: DISPLAY_NIC_COUNT }, (_, i) =>
+    device.nics[i] ?? { name: `网卡 ${i + 1}`, type: "未连接" },
+  );
   const [series, setSeries] = useState<Sample[][]>(() =>
-    device.nics.map(() => makeInitial()),
+    Array.from({ length: DISPLAY_NIC_COUNT }, () => makeInitial()),
   );
   const baseRef = useRef<number[]>([]);
 
   // reset when device changes
   useEffect(() => {
-    baseRef.current = device.nics.map(() => 2 + Math.random() * 8);
-    setSeries(device.nics.map(() => makeInitial()));
+    baseRef.current = Array.from({ length: DISPLAY_NIC_COUNT }, (_, i) =>
+      i < device.nics.length ? 2 + Math.random() * 8 : 0,
+    );
+    setSeries(Array.from({ length: DISPLAY_NIC_COUNT }, () => makeInitial()));
   }, [device.id, device.nics.length]);
 
   useEffect(() => {
     const id = setInterval(() => {
       setSeries((prev) =>
         prev.map((arr, i) => {
+          const activeNic = i < device.nics.length;
           const base = baseRef.current[i] ?? 5;
           const drift = Math.sin(Date.now() / (4000 + i * 700)) * base * 0.4;
           const up = offline
             ? 0
-            : Math.max(0, base + drift + (Math.random() - 0.5) * base * 0.6);
+            : activeNic
+              ? Math.max(0, base + drift + (Math.random() - 0.5) * base * 0.6)
+              : 0;
           const down = offline
             ? 0
-            : Math.max(0, base * 1.6 + drift * 1.2 + (Math.random() - 0.5) * base);
+            : activeNic
+              ? Math.max(0, base * 1.6 + drift * 1.2 + (Math.random() - 0.5) * base)
+              : 0;
           const next = arr.slice(1);
           next.push({ t: Date.now(), up: +up.toFixed(2), down: +down.toFixed(2) });
           return next;
@@ -59,7 +70,7 @@ export function NetworkPanel({ device }: { device: Device }) {
       );
     }, 1000);
     return () => clearInterval(id);
-  }, [offline]);
+  }, [device.nics.length, offline]);
 
   return (
     <section className="panel flex flex-col h-full overflow-hidden">
@@ -71,8 +82,8 @@ export function NetworkPanel({ device }: { device: Device }) {
         <span className="text-[11px] text-muted-foreground">采样 1s · 单位 Mbps</span>
       </div>
 
-      <div className="flex-1 grid grid-cols-2 lg:grid-cols-3 gap-3 p-3 min-h-0">
-        {device.nics.map((nic, i) => {
+      <div className="flex-1 grid grid-cols-2 lg:grid-cols-4 gap-3 p-3 min-h-0">
+        {displayNics.map((nic, i) => {
           const data = series[i] ?? [];
           const last = data[data.length - 1] ?? { up: 0, down: 0 };
           const color = CHART_COLOR;
