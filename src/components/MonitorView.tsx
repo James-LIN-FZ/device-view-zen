@@ -85,6 +85,11 @@ function makeInitialSeries(): Sample[] {
   return Array.from({ length: POINTS }, (_, i) => ({ t: now - (POINTS - i) * 1000, up: 0, down: 0 }));
 }
 
+function makeInitialQuality(): QualitySample[] {
+  const now = Date.now();
+  return Array.from({ length: POINTS }, (_, i) => ({ t: now - (POINTS - i) * 1000, rtt: 0, loss: 0 }));
+}
+
 export function MonitorView({ devices }: { devices: BackendDevice[] }) {
   const [slots, setSlots] = useState<(string | null)[]>(() => Array(SLOT_COUNT).fill(null));
   const [hoverSlot, setHoverSlot] = useState<number | null>(null);
