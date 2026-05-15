@@ -18,7 +18,7 @@ export interface DeviceBinding {
 
 // ====== 虚拟数据模式（演示用）======
 // 后端联调完成后，将 USE_MOCK 设为 false 即可走真实接口。
-const USE_MOCK = true;
+const USE_MOCK = false;
 
 let mockUsers: BackendUser[] = [
   { id: 1, username: "admin", role: "admin", createdAt: "2025-01-01 10:00" },
@@ -80,7 +80,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function fetchUsers(): Promise<BackendUser[]> {
   if (USE_MOCK) return delay([...mockUsers]);
-  return request<BackendUser[]>("/api/users");
+  return request<BackendUser[]>("/api/admin/users");
 }
 
 export function createUser(payload: {
@@ -101,7 +101,7 @@ export function createUser(payload: {
     mockUsers = [...mockUsers, u];
     return delay(u);
   }
-  return request<BackendUser>("/api/users", {
+  return request<BackendUser>("/api/admin/users", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -113,7 +113,7 @@ export function deleteUser(id: number): Promise<void> {
     mockBindings = mockBindings.filter((b) => b.userId !== id);
     return delay(undefined);
   }
-  return request<void>(`/api/users/${id}`, { method: "DELETE" });
+  return request<void>(`/api/admin/users/${id}`, { method: "DELETE" });
 }
 
 export function updateUserPassword(id: number, password: string): Promise<void> {
@@ -122,7 +122,7 @@ export function updateUserPassword(id: number, password: string): Promise<void> 
     void password;
     return delay(undefined);
   }
-  return request<void>(`/api/users/${id}/password`, {
+  return request<void>(`/api/admin/users/${id}/password`, {
     method: "PUT",
     body: JSON.stringify({ password }),
   });
@@ -134,15 +134,20 @@ export function updateOwnPassword(oldPassword: string, newPassword: string): Pro
     void newPassword;
     return delay(undefined);
   }
-  return request<void>(`/api/auth/password`, {
-    method: "PUT",
+  return request<void>(`/api/me/password`, {
+    method: "POST",
     body: JSON.stringify({ oldPassword, newPassword }),
   });
 }
 
 export function fetchBindings(): Promise<DeviceBinding[]> {
   if (USE_MOCK) return delay([...mockBindings]);
-  return request<DeviceBinding[]>("/api/bindings");
+  return request<DeviceBinding[]>("/api/assignments");
+}
+
+export function fetchAllBindings(): Promise<DeviceBinding[]> {
+  if (USE_MOCK) return delay([...mockBindings]);
+  return request<DeviceBinding[]>("/api/admin/assignments");
 }
 
 export function createBinding(payload: {
@@ -163,16 +168,24 @@ export function createBinding(payload: {
     mockBindings = [...mockBindings, b];
     return delay(b);
   }
-  return request<DeviceBinding>("/api/bindings", {
+  return request<DeviceBinding>("/api/admin/assignments", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export function deleteBinding(id: number): Promise<void> {
+export function deleteBinding(payload: {
+  userId: number;
+  serialNo: string;
+}): Promise<void> {
   if (USE_MOCK) {
-    mockBindings = mockBindings.filter((b) => b.id !== id);
+    mockBindings = mockBindings.filter(
+      (b) => !(b.userId === payload.userId && b.serialNo === payload.serialNo),
+    );
     return delay(undefined);
   }
-  return request<void>(`/api/bindings/${id}`, { method: "DELETE" });
+  return request<void>(`/api/admin/assignments`, {
+    method: "DELETE",
+    body: JSON.stringify({ userId: payload.userId, serial: payload.serialNo }),
+  });
 }

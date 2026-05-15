@@ -23,6 +23,7 @@ import {
   createUser,
   deleteBinding,
   deleteUser,
+  fetchAllBindings,
   fetchBindings,
   fetchUsers,
   updateOwnPassword,
@@ -63,7 +64,7 @@ export function UserManagementView({ onUnauthorized }: Props) {
     setError("");
     try {
       if (isAdmin) {
-        const [u, b] = await Promise.all([fetchUsers(), fetchBindings()]);
+        const [u, b] = await Promise.all([fetchUsers(), fetchAllBindings()]);
         setUsers(u);
         setBindings(b);
       } else {
@@ -154,8 +155,8 @@ export function UserManagementView({ onUnauthorized }: Props) {
           onUnbind={async (b) => {
             if (!confirm(`解除 ${b.username} 与 ${b.serialNo} 的绑定？`)) return;
             try {
-              await deleteBinding(b.id);
-              setBindings((curr) => curr.filter((x) => x.id !== b.id));
+              await deleteBinding({ userId: b.userId, serialNo: b.serialNo });
+              setBindings((curr) => curr.filter((x) => !(x.userId === b.userId && x.serialNo === b.serialNo)));
             } catch (err) {
               handleErr(err, "解除绑定失败");
             }
