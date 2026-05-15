@@ -326,20 +326,21 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
         </button>
       </div>
 
-      {/* Preview */}
-      <div className="relative aspect-video bg-black border-b border-border">
-        <canvas ref={canvasRef} width={480} height={270} className="h-full w-full object-cover" />
-        <div className="absolute top-1 left-1 rounded-sm bg-black/60 px-1 py-0.5 text-[9px] font-mono">
-          {resolution} · {fps > 0 ? `${fps}fps` : "--"}
+      {/* Body: preview left, params + chart right */}
+      <div className="flex-1 grid grid-cols-[40%_30%_30%] min-h-0">
+        {/* Preview */}
+        <div className="relative bg-black border-r border-border min-h-0 overflow-hidden">
+          <canvas ref={canvasRef} width={480} height={270} className="h-full w-full object-cover" />
+          <div className="absolute top-1 left-1 rounded-sm bg-black/60 px-1 py-0.5 text-[9px] font-mono">
+            {resolution} · {fps > 0 ? `${fps}fps` : "--"}
+          </div>
+          <div className="absolute bottom-1 right-1 rounded-sm bg-black/60 px-1 py-0.5 text-[9px] font-mono text-primary">
+            {actBitrate}
+          </div>
         </div>
-        <div className="absolute bottom-1 right-1 rounded-sm bg-black/60 px-1 py-0.5 text-[9px] font-mono text-primary">
-          {actBitrate}
-        </div>
-      </div>
 
-      {/* Params + chart */}
-      <div className="flex-1 grid grid-cols-2 min-h-0">
-        <div className="overflow-y-auto border-r border-border text-[10px] divide-y divide-border">
+        {/* Params */}
+        <div className="overflow-y-auto border-r border-border text-[10px] divide-y divide-border min-h-0">
           <ParamRow k="视频源" v={videoSource} />
           <ParamRow k="视频编码" v={videoCodec} />
           <ParamRow k="分辨率" v={resolution} />
@@ -349,13 +350,14 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
           <ParamRow k="音频编码" v={audioCodec} />
           <ParamRow k="推流" v={streamUrl} mono />
         </div>
+
+        {/* Network chart */}
         <div className="flex flex-col min-h-0">
           <div className="px-2 py-1 border-b border-border flex items-center justify-between text-[10px]">
-            <span className="text-muted-foreground">网络总和</span>
+            <span className="text-muted-foreground">网络</span>
             <span className="font-mono tabular-nums text-primary">
               ↑{last.up.toFixed(1)}
               <span className="text-muted-foreground">/</span>↓{last.down.toFixed(1)}
-              <span className="text-muted-foreground"> kbps</span>
             </span>
           </div>
           <div className="flex-1 min-h-0">
