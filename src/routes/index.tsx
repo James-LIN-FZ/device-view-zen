@@ -98,7 +98,7 @@ function Dashboard() {
   return (
     <div className="h-screen flex flex-col">
       <TopBar />
-      <div className="flex-1 min-h-0 grid gap-2 p-2" style={{ gridTemplateColumns: "auto 1fr 3fr" }}>
+      <div className="flex-1 min-h-0 grid gap-2 p-2" style={{ gridTemplateColumns: "auto 0.67fr 3fr" }}>
         <ViewSwitcher active={activeView} onChange={setActiveView} />
         {activeView === "users" ? (
           <div className="col-span-2 min-h-0">
