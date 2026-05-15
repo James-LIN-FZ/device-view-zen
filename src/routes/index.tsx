@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { TopBar } from "@/components/TopBar";
 import { DeviceList } from "@/components/DeviceList";
+import { ViewSwitcher, type ViewKey } from "@/components/ViewSwitcher";
 import { EncodingPanel } from "@/components/EncodingPanel";
 import { NetworkPanel } from "@/components/NetworkPanel";
 import { isAuthenticated } from "@/lib/auth";
