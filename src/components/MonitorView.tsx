@@ -322,7 +322,7 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
   const actBitrate = status?.sVideoCodec?.sActBitrate || status?.sVideoCodec?.sBitrate || "--";
   const videoSource = status?.sVideoParams?.sDevice || "--";
   const audioSource = status?.sAudioParams?.sDevice || "--";
-  const streamUrl = status?.sMuxer?.sURL || "--";
+  
 
   return (
     <div className="flex flex-col h-full min-h-0">
