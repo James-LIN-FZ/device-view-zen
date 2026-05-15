@@ -5,7 +5,7 @@ import { DeviceList } from "@/components/DeviceList";
 import { EncodingPanel } from "@/components/EncodingPanel";
 import { NetworkPanel } from "@/components/NetworkPanel";
 import { isAuthenticated } from "@/lib/auth";
-import { fetchMyDevices, updateDeviceName, type BackendDevice } from "@/lib/device-api";
+import { fetchDeviceStatus, fetchMyDevices, updateDeviceName, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
 import { devices as demoDevices } from "@/lib/devices";
 
 export const Route = createFileRoute("/")({
@@ -25,6 +25,12 @@ function Dashboard() {
   const [selectedDemoIndex, setSelectedDemoIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deviceStatus, setDeviceStatus] = useState<BackendDeviceStatusData | null>(null);
+
+  const selectedDevice = useMemo(
+    () => devices.find((device) => device.serialNo === selectedId) ?? null,
+    [devices, selectedId],
+  );
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -60,6 +66,33 @@ function Dashboard() {
       active = false;
     };
   }, [navigate]);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setDeviceStatus(null);
+      return;
+    }
+
+    let active = true;
+    fetchDeviceStatus(selectedId)
+      .then((status) => {
+        if (!active) return;
+        setDeviceStatus(status);
+      })
+      .catch((err) => {
+        if (!active) return;
+        const message = err instanceof Error ? err.message : "获取设备状态失败";
+        if (message === "unauthorized") {
+          navigate({ to: "/login" });
+          return;
+        }
+        setDeviceStatus(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [navigate, selectedId]);
 
   const selected = useMemo(
     () => demoDevices[selectedDemoIndex] ?? demoDevices[0],
@@ -107,7 +140,11 @@ function Dashboard() {
           {loading ? <div className="text-xs text-muted-foreground px-2">加载设备中...</div> : null}
         </div>
         <div className="grid grid-rows-2 gap-2 min-h-0">
-          <EncodingPanel device={selected} />
+          <EncodingPanel
+            deviceName={selectedDevice?.name?.trim() || "未命名设备"}
+            online={selectedDevice?.online ?? false}
+            status={deviceStatus}
+          />
           <NetworkPanel device={selected} />
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Activity, Video, Settings2, Save, RotateCcw } from "lucide-react";
-import type { Device } from "@/lib/devices";
+import type { BackendDeviceStatusData } from "@/lib/device-api";
 
 const VIDEO_SOURCES = ["SDI-1", "SDI-2", "HDMI-1", "HDMI-2", "NDI", "USB"];
 const VIDEO_CODECS = ["H.264 / AVC", "H.265 / HEVC", "AV1"];
@@ -8,21 +8,131 @@ const AUDIO_CODECS = ["AAC-LC 48kHz", "AAC-HE 48kHz", "Opus 48kHz", "MP3 44.1kHz
 const RESOLUTIONS = ["3840 × 2160", "1920 × 1080", "1280 × 720", "854 × 480"];
 const FRAMERATES = ["24 fps", "25 fps", "30 fps", "50 fps", "60 fps"];
 
-export function EncodingPanel({ device }: { device: Device }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+type EncodingForm = {
+  videoSource: string;
+  videoCodec: string;
+  audioCodec: string;
+  bitrate: string;
+  framerate: string;
+  resolution: string;
+  streamUrl: string;
+};
 
-  // editable form state, reset when device changes
-  const [form, setForm] = useState(device.encoding);
-  const [bitrateNum, setBitrateNum] = useState(() => parseInt(device.encoding.bitrate) || 8);
+const EMPTY_FORM: EncodingForm = {
+  videoSource: "--",
+  videoCodec: "--",
+  audioCodec: "--",
+  bitrate: "--",
+  framerate: "--",
+  resolution: "--",
+  streamUrl: "--",
+};
+
+function normalizeVideoSource(value?: string): string {
+  if (!value) return "--";
+  const upper = value.toUpperCase();
+  if (upper.includes("HDMI")) return "HDMI-1";
+  if (upper.includes("SDI")) return "SDI-1";
+  if (upper.includes("USB")) return "USB";
+  if (upper.includes("NDI")) return "NDI";
+  return value;
+}
+
+function normalizeVideoCodec(value?: string): string {
+  if (!value) return "--";
+  const upper = value.toUpperCase();
+  if (upper.includes("H264")) return "H.264 / AVC";
+  if (upper.includes("H265")) return "H.265 / HEVC";
+  if (upper.includes("AV1")) return "AV1";
+  return value;
+}
+
+function normalizeAudioCodec(value?: string): string {
+  if (!value) return "--";
+  const upper = value.toUpperCase();
+  if (upper.includes("AAC")) return "AAC-LC 48kHz";
+  if (upper.includes("OPUS")) return "Opus 48kHz";
+  if (upper.includes("MP3")) return "MP3 44.1kHz";
+  return value;
+}
+
+function normalizeResolution(status: BackendDeviceStatusData | null | undefined): string {
+  if (!status) return "--";
+  const raw = status.sVideoCodec?.sResolution || status.sVideoParams?.sResolution || "--";
+  const width = status.sVideoCodec?.iWidth || status.sVideoParams?.iWidth || 0;
+  const height = status.sVideoCodec?.iHeight || status.sVideoParams?.iHeight || 0;
+  if (width > 0 && height > 0) {
+    return `${width} × ${height}`;
+  }
+  if (raw.toLowerCase() === "nosignal" || raw.toLowerCase() === "no signal") {
+    return "—";
+  }
+  if (raw.includes("1080")) return "1920 × 1080";
+  if (raw.includes("720")) return "1280 × 720";
+  if (raw.includes("2160") || raw.includes("4k")) return "3840 × 2160";
+  return raw || "--";
+}
+
+function normalizeFramerate(status: BackendDeviceStatusData | null | undefined): string {
+  if (!status) return "--";
+  const fps = status.sVideoCodec?.iFPS || status.sVideoParams?.iFPS || 0;
+  if (fps > 0) return `${fps} fps`;
+  const raw = status.sVideoCodec?.sResolution || status.sVideoParams?.sResolution || "";
+  const match = raw.match(/(\d{2,3})p(\d{2})/i);
+  if (match) return `${match[2]} fps`;
+  return "--";
+}
+
+function parseVideoBitrate(status: BackendDeviceStatusData | null | undefined): number {
+  if (!status) return 0;
+  if ((status.sVideoCodec?.iBitrate || 0) > 0) {
+    return Math.max(1, Math.round((status.sVideoCodec?.iBitrate || 0) / 1_000_000));
+  }
+  const raw = status.sVideoCodec?.sBitrate || status.sVideoCodec?.sActBitrate || "";
+  const match = raw.match(/([\d.]+)\s*(k|m|g)?bps/i);
+  if (!match) return 0;
+  const value = Number(match[1]);
+  const unit = (match[2] || "m").toLowerCase();
+  if (Number.isNaN(value)) return 0;
+  if (unit === "k") return Math.max(1, Math.round(value / 1000));
+  if (unit === "g") return Math.max(1, Math.round(value * 1000));
+  return Math.max(1, Math.round(value));
+}
+
+function buildForm(status: BackendDeviceStatusData | null | undefined): EncodingForm {
+  if (!status) return EMPTY_FORM;
+  return {
+    videoSource: `${normalizeVideoSource(status.sVideoParams?.sDevice)}${status.sVideoParams?.sResolution ? ` (${status.sVideoParams.sResolution})` : ""}`,
+    videoCodec: normalizeVideoCodec(status.sVideoCodec?.sCodec),
+    audioCodec: normalizeAudioCodec(status.sAudioCodec?.sCodec),
+    bitrate: status.sVideoCodec?.sBitrate || status.sVideoCodec?.sActBitrate || "--",
+    framerate: normalizeFramerate(status),
+    resolution: normalizeResolution(status),
+    streamUrl: status.sMuxer?.sURL || "--",
+  };
+}
+
+export function EncodingPanel({
+  deviceName,
+  online,
+  status,
+}: {
+  deviceName: string;
+  online: boolean;
+  status: BackendDeviceStatusData | null;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [form, setForm] = useState<EncodingForm>(() => buildForm(status));
+  const [bitrateNum, setBitrateNum] = useState(() => parseVideoBitrate(status) || 8);
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
-    setForm(device.encoding);
-    setBitrateNum(parseInt(device.encoding.bitrate) || 8);
+    setForm(buildForm(status));
+    setBitrateNum(parseVideoBitrate(status) || 8);
     setDirty(false);
-  }, [device.id]);
+  }, [status]);
 
-  const update = <K extends keyof typeof form>(k: K, v: string) => {
+  const update = <K extends keyof EncodingForm>(k: K, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
     setDirty(true);
   };
@@ -35,7 +145,7 @@ export function EncodingPanel({ device }: { device: Device }) {
     if (!ctx) return;
     let raf = 0;
     let frame = 0;
-    const offline = device.status === "offline";
+    const offline = !online;
 
     const draw = () => {
       const w = canvas.width;
@@ -85,9 +195,9 @@ export function EncodingPanel({ device }: { device: Device }) {
     };
     draw();
     return () => cancelAnimationFrame(raf);
-  }, [device.status, device.id]);
+  }, [online, deviceName]);
 
-  const live = device.status === "streaming";
+  const live = online;
 
   return (
     <section className="panel flex flex-col h-full overflow-hidden">
@@ -95,13 +205,13 @@ export function EncodingPanel({ device }: { device: Device }) {
         <div className="flex items-center gap-2">
           <Video className="h-3.5 w-3.5 text-primary" />
           <h3 className="text-xs font-semibold tracking-wide uppercase">编码状态</h3>
-          <span className="text-[11px] text-muted-foreground">· {device.name}</span>
+          <span className="text-[11px] text-muted-foreground">· {deviceName}</span>
         </div>
         <div className="flex items-center gap-2 text-[11px]">
           <span className="flex items-center gap-1.5">
             <span className={`status-dot inline-block h-1.5 w-1.5 rounded-full ${live ? "bg-destructive" : "bg-muted-foreground"}`} />
             <span className={live ? "text-destructive font-medium" : "text-muted-foreground"}>
-              {live ? "LIVE" : device.status === "online" ? "STANDBY" : "OFFLINE"}
+              {live ? "LIVE" : "OFFLINE"}
             </span>
           </span>
         </div>
@@ -148,7 +258,7 @@ export function EncodingPanel({ device }: { device: Device }) {
           </div>
           <div className="p-2.5 space-y-2 text-[11px]">
             <Field label="视频源">
-              <Select value={form.videoSource.split(" ")[0]} onChange={(v) => update("videoSource", v)} options={VIDEO_SOURCES} />
+              <Select value={form.videoSource} onChange={(v) => update("videoSource", v)} options={VIDEO_SOURCES} />
             </Field>
             <Field label="视频编码">
               <Select value={form.videoCodec} onChange={(v) => update("videoCodec", v)} options={VIDEO_CODECS} />
@@ -170,7 +280,7 @@ export function EncodingPanel({ device }: { device: Device }) {
                 value={bitrateNum}
                 onChange={(e) => { setBitrateNum(+e.target.value); setDirty(true); }}
                 className="w-full accent-[var(--color-primary)]"
-                disabled={device.status === "offline"}
+                disabled={!online}
               />
               <div className="flex justify-between text-[9px] text-muted-foreground mt-0.5">
                 <span>1</span><span>25</span><span>50</span>
@@ -187,7 +297,7 @@ export function EncodingPanel({ device }: { device: Device }) {
           </div>
           <div className="mt-auto p-2 border-t border-border flex gap-1.5 bg-background/30">
             <button
-              onClick={() => { setForm(device.encoding); setBitrateNum(parseInt(device.encoding.bitrate) || 8); setDirty(false); }}
+              onClick={() => { setForm(buildForm(status)); setBitrateNum(parseVideoBitrate(status) || 8); setDirty(false); }}
               className="flex-1 inline-flex items-center justify-center gap-1 rounded-sm border border-border bg-secondary/40 px-2 py-1.5 text-[11px] hover:border-primary/50 transition"
             >
               <RotateCcw className="h-3 w-3" /> 重置

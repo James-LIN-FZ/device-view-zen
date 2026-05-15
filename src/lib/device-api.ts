@@ -7,6 +7,68 @@ export interface BackendDevice {
   online: boolean;
 }
 
+export interface BackendDeviceStatusData {
+  sAudioCodec: {
+    iBitrate: number;
+    iChannels: number;
+    iPoc: number;
+    iSampleRate: number;
+    iTc: number;
+    sBitrate: string;
+    sCodec: string;
+    sFormat: string;
+  };
+  sAudioParams: {
+    iChannels: number;
+    iPoc: number;
+    iSampleRate: number;
+    iTc: number;
+    iVolume: number;
+    sDevice: string;
+    sFormat: string;
+  };
+  sName: string;
+  sVideoCodec: {
+    iActBitrate: number;
+    iActFPS: number;
+    iBitrate: number;
+    iFPS: number;
+    iField: number;
+    iHeight: number;
+    iPoc: number;
+    iTc: number;
+    iWidth: number;
+    sActBitrate: string;
+    sBitrate: string;
+    sCodec: string;
+    sFormat: string;
+    sResolution: string;
+  };
+  sVideoParams: {
+    iFPS: number;
+    iField: number;
+    iHeight: number;
+    iPoc: number;
+    iTc: number;
+    iWidth: number;
+    sDevice: string;
+    sFormat: string;
+    sResolution: string;
+  };
+  sMuxer?: {
+    iSendSize?: number;
+    iStream?: number;
+    sSrt?: {
+      iMsRTT?: number;
+      iPktDrop?: number;
+      iPktLoss?: number;
+      iPktRetrans?: number;
+      iPktSent?: number;
+    };
+    sURL?: string;
+  };
+}
+
 function getApiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
   return (configured?.trim() || "http://127.0.0.1:18081").replace(/\/$/, "");
@@ -76,4 +138,31 @@ export async function updateDeviceName(serialNo: string, name: string): Promise<
     }
     throw new Error(message);
   }
+}
+
+export async function fetchDeviceStatus(serialNo: string): Promise<BackendDeviceStatusData | null> {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error("missing auth token");
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/api/devices/${encodeURIComponent(serialNo)}/status`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (response.status === 401) {
+    throw new Error("unauthorized");
+  }
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error("获取设备状态失败");
+  }
+
+  return (await response.json()) as BackendDeviceStatusData;
 }
