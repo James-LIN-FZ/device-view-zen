@@ -370,59 +370,115 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
           <ParamRow k="码率" v={actBitrate} highlight />
           <ParamRow k="音频源" v={audioSource} />
           <ParamRow k="音频编码" v={audioCodec} />
-          <ParamRow k="推流" v={streamUrl} mono />
         </div>
 
-        {/* Network chart */}
+        {/* Charts: quality (top) + network (bottom) */}
         <div className="flex flex-col min-h-0">
-          <div className="px-2 py-1 border-b border-border flex items-center justify-between text-[10px]">
-            <span className="text-muted-foreground">网络</span>
-            <span className="font-mono tabular-nums text-primary">
-              ↑{last.up.toFixed(1)}
-              <span className="text-muted-foreground">/</span>↓{last.down.toFixed(1)}
-            </span>
+          {/* Quality chart */}
+          <div className="flex flex-col min-h-0 flex-1 border-b border-border">
+            <div className="px-2 py-1 border-b border-border flex items-center justify-between text-[10px]">
+              <span className="text-muted-foreground">传输质量</span>
+              <span className="font-mono tabular-nums text-primary">
+                RTT {lastQ.rtt.toFixed(0)}ms
+                <span className="text-muted-foreground"> · </span>
+                丢包 {lastQ.loss.toFixed(0)}
+              </span>
+            </div>
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={qualitySeries} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id={`m-q-${device.serialNo}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--color-warning, #f59e0b)" stopOpacity={0.45} />
+                      <stop offset="100%" stopColor="var(--color-warning, #f59e0b)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="t" hide />
+                  <YAxis width={24} tick={{ fill: "var(--color-muted-foreground)", fontSize: 8 }} tickLine={false} axisLine={{ stroke: GRID_COLOR }} domain={[0, "auto"]} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--color-popover)",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: 6,
+                      fontSize: 10,
+                    }}
+                    labelFormatter={(v) => new Date(v as number).toLocaleTimeString()}
+                    formatter={(v: number, name) => [name === "rtt" ? `${v} ms` : `${v}`, name === "rtt" ? "RTT" : "丢包"]}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="loss"
+                    stroke="var(--color-destructive)"
+                    strokeDasharray="3 3"
+                    strokeOpacity={0.6}
+                    strokeWidth={1.2}
+                    fill={`url(#m-q-${device.serialNo})`}
+                    isAnimationActive={false}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="rtt"
+                    stroke="var(--color-warning, #f59e0b)"
+                    strokeWidth={1}
+                    fill={`url(#m-q-${device.serialNo})`}
+                    isAnimationActive={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-          <div className="flex-1 min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={series} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id={`m-g-${device.serialNo}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={CHART_COLOR} stopOpacity={0.45} />
-                    <stop offset="100%" stopColor={CHART_COLOR} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="t" hide />
-                <YAxis width={24} tick={{ fill: "var(--color-muted-foreground)", fontSize: 8 }} tickLine={false} axisLine={{ stroke: GRID_COLOR }} domain={[0, "auto"]} />
-                <Tooltip
-                  contentStyle={{
-                    background: "var(--color-popover)",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: 6,
-                    fontSize: 10,
-                  }}
-                  labelFormatter={(v) => new Date(v as number).toLocaleTimeString()}
-                  formatter={(v: number, name) => [`${v} kbps`, name === "up" ? "上行" : "下行"]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="down"
-                  stroke={CHART_COLOR}
-                  strokeDasharray="3 3"
-                  strokeOpacity={0.6}
-                  strokeWidth={1.2}
-                  fill={`url(#m-g-${device.serialNo})`}
-                  isAnimationActive={false}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="up"
-                  stroke={CHART_COLOR}
-                  strokeWidth={1}
-                  fill={`url(#m-g-${device.serialNo})`}
-                  isAnimationActive={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+
+          {/* Network chart */}
+          <div className="flex flex-col min-h-0 flex-1">
+            <div className="px-2 py-1 border-b border-border flex items-center justify-between text-[10px]">
+              <span className="text-muted-foreground">网络</span>
+              <span className="font-mono tabular-nums text-primary">
+                ↑{last.up.toFixed(1)}
+                <span className="text-muted-foreground">/</span>↓{last.down.toFixed(1)}
+              </span>
+            </div>
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={series} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id={`m-g-${device.serialNo}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={CHART_COLOR} stopOpacity={0.45} />
+                      <stop offset="100%" stopColor={CHART_COLOR} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="t" hide />
+                  <YAxis width={24} tick={{ fill: "var(--color-muted-foreground)", fontSize: 8 }} tickLine={false} axisLine={{ stroke: GRID_COLOR }} domain={[0, "auto"]} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--color-popover)",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: 6,
+                      fontSize: 10,
+                    }}
+                    labelFormatter={(v) => new Date(v as number).toLocaleTimeString()}
+                    formatter={(v: number, name) => [`${v} kbps`, name === "up" ? "上行" : "下行"]}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="down"
+                    stroke={CHART_COLOR}
+                    strokeDasharray="3 3"
+                    strokeOpacity={0.6}
+                    strokeWidth={1.2}
+                    fill={`url(#m-g-${device.serialNo})`}
+                    isAnimationActive={false}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="up"
+                    stroke={CHART_COLOR}
+                    strokeWidth={1}
+                    fill={`url(#m-g-${device.serialNo})`}
+                    isAnimationActive={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       </div>
