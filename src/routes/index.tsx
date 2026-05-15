@@ -107,50 +107,64 @@ function Dashboard() {
       <TopBar />
       <div className="flex-1 min-h-0 grid gap-2 p-2" style={{ gridTemplateColumns: "auto 1fr 3fr" }}>
         <ViewSwitcher active={activeView} onChange={setActiveView} />
-        <div className="flex flex-col min-h-0 gap-2">
-          {error ? (
-            <div className="panel border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-              {error}
-            </div>
-          ) : null}
-          <div className="flex-1 min-h-0">
-            <DeviceList
-              devices={devices}
-              selectedId={selectedId}
-              onSelect={(device, index) => {
-                setSelectedId(device.serialNo);
-                setSelectedDemoIndex(index % demoDevices.length);
-              }}
-              onRename={async (device, nextName) => {
-                try {
-                  await updateDeviceName(device.serialNo, nextName);
-                  setDevices((current) =>
-                    current.map((item) =>
-                      item.serialNo === device.serialNo ? { ...item, name: nextName } : item,
-                    ),
-                  );
-                } catch (err) {
-                  const message = err instanceof Error ? err.message : "更新设备名称失败";
-                  if (message === "unauthorized") {
-                    navigate({ to: "/login" });
-                    return;
-                  }
-                  setError(message);
-                  throw err;
-                }
-              }}
-            />
+        {activeView === "users" ? (
+          <div className="col-span-2 min-h-0">
+            <UserManagementView onUnauthorized={() => navigate({ to: "/login" })} />
           </div>
-          {loading ? <div className="text-xs text-muted-foreground px-2">加载设备中...</div> : null}
-        </div>
-        <div className="grid grid-rows-2 gap-2 min-h-0">
-          <EncodingPanel
-            deviceName={selectedDevice?.name?.trim() || "未命名设备"}
-            online={selectedDevice?.online ?? false}
-            status={deviceStatus}
-          />
-          <NetworkPanel device={selected} />
-        </div>
+        ) : (
+          <>
+            <div className="flex flex-col min-h-0 gap-2">
+              {error ? (
+                <div className="panel border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  {error}
+                </div>
+              ) : null}
+              <div className="flex-1 min-h-0">
+                <DeviceList
+                  devices={devices}
+                  selectedId={selectedId}
+                  onSelect={(device, index) => {
+                    setSelectedId(device.serialNo);
+                    setSelectedDemoIndex(index % demoDevices.length);
+                  }}
+                  onRename={async (device, nextName) => {
+                    try {
+                      await updateDeviceName(device.serialNo, nextName);
+                      setDevices((current) =>
+                        current.map((item) =>
+                          item.serialNo === device.serialNo ? { ...item, name: nextName } : item,
+                        ),
+                      );
+                    } catch (err) {
+                      const message = err instanceof Error ? err.message : "更新设备名称失败";
+                      if (message === "unauthorized") {
+                        navigate({ to: "/login" });
+                        return;
+                      }
+                      setError(message);
+                      throw err;
+                    }
+                  }}
+                />
+              </div>
+              {loading ? <div className="text-xs text-muted-foreground px-2">加载设备中...</div> : null}
+            </div>
+            <div className="grid grid-rows-2 gap-2 min-h-0">
+              {activeView === "control" ? (
+                <EncodingPanel
+                  deviceName={selectedDevice?.name?.trim() || "未命名设备"}
+                  online={selectedDevice?.online ?? false}
+                  status={deviceStatus}
+                />
+              ) : (
+                <div className="panel flex items-center justify-center text-sm text-muted-foreground">
+                  监看视图 — 即将上线
+                </div>
+              )}
+              <NetworkPanel device={selected} />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
