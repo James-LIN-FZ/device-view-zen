@@ -105,6 +105,7 @@ function Dashboard() {
     <div className="h-screen flex flex-col">
       <TopBar />
       <div className="flex-1 min-h-0 grid gap-2 p-2" style={{ gridTemplateColumns: "auto 1fr 3fr" }}>
+        <ViewSwitcher active={activeView} onChange={setActiveView} />
         <div className="flex flex-col min-h-0 gap-2">
           {error ? (
             <div className="panel border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
