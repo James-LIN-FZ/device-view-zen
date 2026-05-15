@@ -143,20 +143,22 @@ function Dashboard() {
             </div>
             <div className="grid grid-rows-2 gap-2 min-h-0">
               {activeView === "control" ? (
-                <EncodingPanel
-                  deviceName={selectedDevice?.name?.trim() || "未命名设备"}
-                  online={selectedDevice?.online ?? false}
-                  status={deviceStatus}
-                />
+                <>
+                  <EncodingPanel
+                    deviceName={selectedDevice?.name?.trim() || "未命名设备"}
+                    online={selectedDevice?.online ?? false}
+                    status={deviceStatus}
+                  />
+                  <NetworkPanel
+                    serialNo={selectedId}
+                    online={selectedDevice?.online ?? false}
+                  />
+                </>
               ) : (
-                <div className="panel flex items-center justify-center text-sm text-muted-foreground">
-                  监看视图 — 即将上线
+                <div className="row-span-2 min-h-0">
+                  <MonitorView devices={devices} />
                 </div>
               )}
-              <NetworkPanel
-                serialNo={selectedId}
-                online={selectedDevice?.online ?? false}
-              />
             </div>
           </>
         )}
