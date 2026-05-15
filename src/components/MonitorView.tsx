@@ -181,7 +181,9 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
   const [status, setStatus] = useState<BackendDeviceStatusData | null>(null);
   const [onlineState, setOnlineState] = useState(device.online);
   const [series, setSeries] = useState<Sample[]>(() => makeInitialSeries());
+  const [qualitySeries, setQualitySeries] = useState<QualitySample[]>(() => makeInitialQuality());
   const latestRef = useRef<{ up: number; down: number }>({ up: 0, down: 0 });
+  const qualityRef = useRef<{ rtt: number; loss: number }>({ rtt: 0, loss: 0 });
 
   useEffect(() => {
     setOnlineState(device.online);
@@ -193,7 +195,14 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
     const load = () => {
       fetchDeviceStatus(device.serialNo)
         .then((s) => {
-          if (active) setStatus(s);
+          if (active) {
+            setStatus(s);
+            const srt = s?.sMuxer?.sSrt;
+            qualityRef.current = {
+              rtt: Number(srt?.iMsRTT) || 0,
+              loss: Number(srt?.iPktLoss) || 0,
+            };
+          }
         })
         .catch(() => {});
     };
@@ -229,10 +238,17 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
   // Sampler
   useEffect(() => {
     const id = setInterval(() => {
+      const now = Date.now();
       setSeries((prev) => {
         const next = prev.slice(1);
         const { up, down } = onlineState ? latestRef.current : { up: 0, down: 0 };
-        next.push({ t: Date.now(), up: +up.toFixed(2), down: +down.toFixed(2) });
+        next.push({ t: now, up: +up.toFixed(2), down: +down.toFixed(2) });
+        return next;
+      });
+      setQualitySeries((prev) => {
+        const next = prev.slice(1);
+        const { rtt, loss } = onlineState ? qualityRef.current : { rtt: 0, loss: 0 };
+        next.push({ t: now, rtt: +rtt.toFixed(1), loss: +loss.toFixed(2) });
         return next;
       });
     }, 1000);
