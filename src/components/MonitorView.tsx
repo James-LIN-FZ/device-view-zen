@@ -308,6 +308,7 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
   }, [onlineState]);
 
   const last = series[series.length - 1] ?? { up: 0, down: 0 };
+  const lastQ = qualitySeries[qualitySeries.length - 1] ?? { rtt: 0, loss: 0 };
 
   const videoCodec = status?.sVideoCodec?.sCodec || "--";
   const audioCodec = status?.sAudioCodec?.sCodec || "--";
