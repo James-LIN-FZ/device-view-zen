@@ -6,7 +6,6 @@ import { EncodingPanel } from "@/components/EncodingPanel";
 import { NetworkPanel } from "@/components/NetworkPanel";
 import { isAuthenticated } from "@/lib/auth";
 import { fetchDeviceStatus, fetchMyDevices, updateDeviceName, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
-import { devices as demoDevices } from "@/lib/devices";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -22,7 +21,6 @@ function Dashboard() {
   const navigate = useNavigate();
   const [devices, setDevices] = useState<BackendDevice[]>([]);
   const [selectedId, setSelectedId] = useState("");
-  const [selectedDemoIndex, setSelectedDemoIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deviceStatus, setDeviceStatus] = useState<BackendDeviceStatusData | null>(null);
@@ -47,7 +45,6 @@ function Dashboard() {
         if (!active) return;
         setDevices(items);
         setSelectedId((current) => current || items[0]?.serialNo || "");
-        setSelectedDemoIndex(0);
       })
       .catch((err) => {
         if (!active) return;
@@ -94,11 +91,6 @@ function Dashboard() {
     };
   }, [navigate, selectedId]);
 
-  const selected = useMemo(
-    () => demoDevices[selectedDemoIndex] ?? demoDevices[0],
-    [selectedDemoIndex],
-  );
-
   return (
     <div className="h-screen flex flex-col">
       <TopBar />
@@ -113,9 +105,8 @@ function Dashboard() {
             <DeviceList
               devices={devices}
               selectedId={selectedId}
-              onSelect={(device, index) => {
+              onSelect={(device) => {
                 setSelectedId(device.serialNo);
-                setSelectedDemoIndex(index % demoDevices.length);
               }}
               onRename={async (device, nextName) => {
                 try {
@@ -145,7 +136,10 @@ function Dashboard() {
             online={selectedDevice?.online ?? false}
             status={deviceStatus}
           />
-          <NetworkPanel device={selected} />
+          <NetworkPanel
+            serialNo={selectedId}
+            online={selectedDevice?.online ?? false}
+          />
         </div>
       </div>
     </div>
