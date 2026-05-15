@@ -209,8 +209,8 @@ export function EncodingPanel({
 
   const live = online;
   const realtimeBitrate = status?.sVideoCodec?.sActBitrate || "--";
-  const realtimeFramerate = status?.sVideoCodec?.iActBitrate != null
-    ? String(status.sVideoCodec.iActBitrate)
+  const realtimeFramerate = status?.sVideoCodec?.iActFPS != null
+    ? `${status.sVideoCodec.iActFPS} fps`
     : "--";
   const audioSource = status?.sAudioParams?.sDevice || "--";
   const localRecording = "--";

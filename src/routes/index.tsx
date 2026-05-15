@@ -7,8 +7,27 @@ import { EncodingPanel } from "@/components/EncodingPanel";
 import { NetworkPanel } from "@/components/NetworkPanel";
 import { UserManagementView } from "@/components/UserManagementView";
 import { MonitorView } from "@/components/MonitorView";
-import { isAuthenticated } from "@/lib/auth";
-import { fetchDeviceStatus, fetchMyDevices, updateDeviceName, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
+import { getAuthToken, isAuthenticated } from "@/lib/auth";
+import { fetchMyDevices, updateDeviceName, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
+
+type DeviceWsMessage = {
+  type?: string;
+  payload?: unknown;
+  online?: boolean;
+};
+
+function getWsBaseUrl(): string {
+  const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  const httpBase = (configured?.trim() || "http://127.0.0.1:18081").replace(/\/$/, "");
+  if (httpBase.startsWith("https://")) return `wss://${httpBase.slice(8)}`;
+  if (httpBase.startsWith("http://")) return `ws://${httpBase.slice(7)}`;
+  return httpBase;
+}
+
+function toStatusPayload(value: unknown): BackendDeviceStatusData | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as BackendDeviceStatusData;
+}
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -27,6 +46,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deviceStatus, setDeviceStatus] = useState<BackendDeviceStatusData | null>(null);
+  const [deviceOnline, setDeviceOnline] = useState<boolean>(false);
   const [activeView, setActiveView] = useState<ViewKey>("control");
 
   const selectedDevice = useMemo(
@@ -69,29 +89,101 @@ function Dashboard() {
   }, [navigate]);
 
   useEffect(() => {
-    if (!selectedId) {
-      setDeviceStatus(null);
+    if (!isAuthenticated()) {
       return;
     }
 
-    let active = true;
-    fetchDeviceStatus(selectedId)
-      .then((status) => {
-        if (!active) return;
-        setDeviceStatus(status);
-      })
-      .catch((err) => {
-        if (!active) return;
-        const message = err instanceof Error ? err.message : "获取设备状态失败";
+    let disposed = false;
+
+    const refreshDevices = async () => {
+      try {
+        const items = await fetchMyDevices();
+        if (disposed) return;
+
+        setDevices((current) =>
+          items.map((item) => {
+            const existing = current.find((x) => x.serialNo === item.serialNo);
+            // Keep local name during optimistic rename flow until backend list catches up.
+            if (existing && existing.name && !item.name) {
+              return { ...item, name: existing.name };
+            }
+            return item;
+          }),
+        );
+
+        setSelectedId((current) => {
+          if (current && items.some((item) => item.serialNo === current)) return current;
+          return items[0]?.serialNo || "";
+        });
+      } catch (err) {
+        if (disposed) return;
+        const message = err instanceof Error ? err.message : "获取设备列表失败";
         if (message === "unauthorized") {
           navigate({ to: "/login" });
-          return;
         }
-        setDeviceStatus(null);
-      });
+      }
+    };
+
+    const timer = setInterval(() => {
+      void refreshDevices();
+    }, 10000);
 
     return () => {
-      active = false;
+      disposed = true;
+      clearInterval(timer);
+    };
+  }, [navigate]);
+
+  useEffect(() => {
+    setDeviceOnline(selectedDevice?.online ?? false);
+  }, [selectedDevice?.online, selectedId]);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setDeviceStatus(null);
+      setDeviceOnline(false);
+      return;
+    }
+
+    setDeviceStatus(null);
+
+    const token = getAuthToken();
+    if (!token) {
+      navigate({ to: "/login" });
+      return;
+    }
+
+    const ws = new WebSocket(
+      `${getWsBaseUrl()}/api/ws/devices/${encodeURIComponent(selectedId)}?token=${encodeURIComponent(token)}`,
+    );
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(String(event.data)) as DeviceWsMessage;
+        if (typeof msg.online === "boolean") {
+          setDeviceOnline(msg.online);
+          setDevices((current) =>
+            current.map((item) =>
+              item.serialNo === selectedId ? { ...item, online: msg.online as boolean } : item,
+            ),
+          );
+        }
+
+        if (msg.type !== "codec") return;
+        const nextStatus = toStatusPayload(msg.payload);
+        if (!nextStatus) return;
+        setDeviceStatus(nextStatus);
+      } catch {
+        // Ignore malformed messages and keep current UI state.
+      }
+    };
+
+    ws.onerror = () => {
+      setError((prev) => prev || "设备状态实时连接失败");
+    };
+
+    return () => {
+      ws.close();
     };
   }, [navigate, selectedId]);
 
@@ -146,12 +238,12 @@ function Dashboard() {
                 <>
                   <EncodingPanel
                     deviceName={selectedDevice?.name?.trim() || "未命名设备"}
-                    online={selectedDevice?.online ?? false}
+                    online={deviceOnline}
                     status={deviceStatus}
                   />
                   <NetworkPanel
                     serialNo={selectedId}
-                    online={selectedDevice?.online ?? false}
+                    online={deviceOnline}
                   />
                 </>
               ) : (
