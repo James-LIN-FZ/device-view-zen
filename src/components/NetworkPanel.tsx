@@ -244,15 +244,15 @@ export function NetworkPanel({ serialNo, online }: { serialNo: string; online: b
                     </button>
                   </div>
                   <div className={`font-mono text-xs tabular-nums ${isEmpty ? "text-muted-foreground" : ""}`} style={isEmpty ? undefined : { color }}>
-                    {isEmpty ? "--" : `↑${last.up.toFixed(1)}`}
+                    {isEmpty ? "--" : `↑${last.up.toFixed(1)} Kbps`}
                     <span className="text-muted-foreground">/</span>
                     {isEmpty ? "--" : `↓${last.down.toFixed(1)} Kbps`}
                   </div>
                 </div>
               </div>
-              <div className="flex-1 min-h-0 -ml-2">
+              <div className="flex-1 min-h-0 -mx-2 -mb-3">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                  <AreaChart data={data} margin={{ top: 2, right: 0, left: -6, bottom: -10 }}>
                     <defs>
                       <linearGradient id={`g-${i}`} x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor={color} stopOpacity={0.45} />
@@ -272,7 +272,7 @@ export function NetworkPanel({ serialNo, online }: { serialNo: string; online: b
                       minTickGap={30}
                     />
                     <YAxis
-                      width={28}
+                      width={24}
                       tick={{ fill: "var(--color-muted-foreground)", fontSize: 9 }}
                       tickLine={false}
                       axisLine={{ stroke: GRID_COLOR }}

@@ -189,7 +189,7 @@ export function SmartStreamView({
       <div className="relative flex-1 min-h-0 overflow-auto p-4 flex items-center justify-center">
         {/* Draggable push palette pinned to top-left */}
         <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5">
-          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">拖拽推流</span>
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">拖拽添加任务</span>
           {(Object.keys(PUSH_META) as PushType[]).map((t) => {
             const { label, Icon } = PUSH_META[t];
             return (
@@ -400,7 +400,7 @@ export function SmartStreamView({
                         : "border-primary/40 text-muted-foreground hover:border-primary/70",
                     )}
                   >
-                    <span className="opacity-70">空槽 {i + 1} · 拖入推流</span>
+                    <span className="opacity-70">空槽 {i + 1} · 拖入任务</span>
                   </div>
                 );
               })}
