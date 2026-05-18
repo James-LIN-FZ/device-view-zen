@@ -249,19 +249,25 @@ export function SmartStreamView({
             <div className="flex flex-col gap-2">
               {/* Fixed: SRT Server */}
               <FixedNode
-                icon={<Radio className="h-4 w-4" />}
+                icon={<Video className="h-4 w-4" />}
                 title="SRT Server"
-                detail={selectedNode === "srt-server" ? SRT_PULL : "点击查看拉流地址"}
-                active={selectedNode === "srt-server"}
-                onClick={() => setSelectedNode("srt-server")}
+                detail={SRT_PULL}
+                copied={copiedKey === "srt-server"}
+                onClick={() => {
+                  setSelectedNode("srt-server");
+                  copyToClipboard("srt-server", SRT_PULL);
+                }}
               />
               {/* Fixed: RTSP Server */}
               <FixedNode
                 icon={<Video className="h-4 w-4" />}
                 title="RTSP Server"
-                detail={selectedNode === "rtsp-server" ? RTSP_PULL : "点击查看拉流地址"}
-                active={selectedNode === "rtsp-server"}
-                onClick={() => setSelectedNode("rtsp-server")}
+                detail={RTSP_PULL}
+                copied={copiedKey === "rtsp-server"}
+                onClick={() => {
+                  setSelectedNode("rtsp-server");
+                  copyToClipboard("rtsp-server", RTSP_PULL);
+                }}
               />
 
               {/* Editable slots */}
