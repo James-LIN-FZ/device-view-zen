@@ -135,40 +135,11 @@ export function SmartStreamView({
 
   return (
     <section className="panel flex flex-col h-full overflow-hidden">
-      {/* Header with push palette + actions */}
-      <div className="px-3 py-2 border-b border-border flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Workflow className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold tracking-wide">智流管理</h2>
-          </div>
-          <div className="h-4 w-px bg-border" />
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-muted-foreground mr-1">拖拽:</span>
-            {(Object.keys(PUSH_META) as PushType[]).map((t) => {
-              const { label, Icon } = PUSH_META[t];
-              return (
-                <div
-                  key={t}
-                  draggable
-                  onDragStart={(e) => {
-                    setDragType(t);
-                    e.dataTransfer.effectAllowed = "copy";
-                    e.dataTransfer.setData("text/plain", t);
-                  }}
-                  onDragEnd={() => {
-                    setDragType(null);
-                    setHoverSlot(null);
-                  }}
-                  className="flex items-center gap-1 rounded-md border border-border bg-card/60 px-2 py-1 text-[11px] cursor-grab active:cursor-grabbing hover:border-primary/60 hover:bg-primary/10 transition-colors"
-                  title={`拖拽 ${label} 到空槽`}
-                >
-                  <Icon className="h-3 w-3 text-primary" />
-                  <span>{label}</span>
-                </div>
-              );
-            })}
-          </div>
+      {/* Header with title + actions */}
+      <div className="px-3 py-2 border-b border-border flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Workflow className="h-4 w-4 text-primary" />
+          <h2 className="text-sm font-semibold tracking-wide">智流管理</h2>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -193,7 +164,36 @@ export function SmartStreamView({
       </div>
 
       {/* Pipeline area */}
-      <div className="flex-1 min-h-0 overflow-auto p-4 flex items-center justify-center">
+      <div className="relative flex-1 min-h-0 overflow-auto p-4 flex items-center justify-center">
+        {/* Draggable push palette pinned to top-left */}
+        <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5">
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">拖拽推流</span>
+          {(Object.keys(PUSH_META) as PushType[]).map((t) => {
+            const { label, Icon } = PUSH_META[t];
+            return (
+              <div
+                key={t}
+                draggable
+                onDragStart={(e) => {
+                  setDragType(t);
+                  e.dataTransfer.effectAllowed = "copy";
+                  e.dataTransfer.setData("text/plain", t);
+                }}
+                onDragEnd={() => {
+                  setDragType(null);
+                  setHoverSlot(null);
+                }}
+                className="flex items-center gap-1.5 rounded-md border border-border bg-card/80 backdrop-blur px-2 py-1 text-[11px] cursor-grab active:cursor-grabbing hover:border-primary/60 hover:bg-primary/10 transition-colors"
+                title={`拖拽 ${label} 到空槽`}
+              >
+                <Icon className="h-3.5 w-3.5 text-primary" />
+                <span>{label}</span>
+              </div>
+            );
+          })}
+        </div>
+
+
         {!device ? (
           <div className="text-xs text-muted-foreground">
             请从左侧选择一个设备查看智流 pipeline
