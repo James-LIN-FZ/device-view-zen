@@ -292,25 +292,51 @@ export function SmartStreamView({
                         <div className="min-w-0 flex-1">
                           <div className="text-[12px] font-medium leading-tight">{label}</div>
                           {isEditing ? (
-                            <input
-                              autoFocus
-                              value={editingUrl}
-                              placeholder={PUSH_META[slot.type].placeholder}
-                              onChange={(e) => setEditingUrl(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              onBlur={commitEdit}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  commitEdit();
-                                }
-                                if (e.key === "Escape") {
-                                  e.preventDefault();
-                                  cancelEdit();
-                                }
-                              }}
-                              className="mt-1 w-full rounded-sm border border-primary/50 bg-background px-1.5 py-0.5 text-[11px] outline-none"
-                            />
+                            <div className="mt-1 space-y-1" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                autoFocus
+                                value={editingUrl}
+                                placeholder={PUSH_META[slot.type].placeholder}
+                                onChange={(e) => setEditingUrl(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && slot.type !== "srt") {
+                                    e.preventDefault();
+                                    commitEdit();
+                                  }
+                                  if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    cancelEdit();
+                                  }
+                                }}
+                                onBlur={slot.type === "srt" ? undefined : commitEdit}
+                                className="w-full rounded-sm border border-primary/50 bg-background px-1.5 py-0.5 text-[11px] outline-none"
+                              />
+                              {slot.type === "srt" && (
+                                <div className="flex items-center gap-1.5">
+                                  <label className="text-[10px] text-muted-foreground shrink-0">延迟</label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    value={editingLatency}
+                                    placeholder="120"
+                                    onChange={(e) => setEditingLatency(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        commitEdit();
+                                      }
+                                      if (e.key === "Escape") {
+                                        e.preventDefault();
+                                        cancelEdit();
+                                      }
+                                    }}
+                                    onBlur={commitEdit}
+                                    className="w-20 rounded-sm border border-primary/50 bg-background px-1.5 py-0.5 text-[11px] outline-none"
+                                  />
+                                  <span className="text-[10px] text-muted-foreground">ms</span>
+                                </div>
+                              )}
+                            </div>
                           ) : (
                             <button
                               type="button"
@@ -319,11 +345,21 @@ export function SmartStreamView({
                                 e.stopPropagation();
                                 setEditingSlot(i);
                                 setEditingUrl(slot.url);
+                                setEditingLatency(slot.latencyMs?.toString() ?? "120");
                                 setSelectedNode(`slot-${i}`);
                               }}
                               title="点击编辑推流地址"
                             >
-                              {slot.url || <span className="italic">未设置 · 点击编辑</span>}
+                              {slot.url ? (
+                                <span className="font-mono">
+                                  {slot.url}
+                                  {slot.type === "srt" && slot.latencyMs != null && (
+                                    <span className="ml-1 text-primary/80">· {slot.latencyMs}ms</span>
+                                  )}
+                                </span>
+                              ) : (
+                                <span className="italic">未设置 · 点击编辑</span>
+                              )}
                             </button>
                           )}
                         </div>
