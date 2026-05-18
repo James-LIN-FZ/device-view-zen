@@ -7,6 +7,7 @@ import { EncodingPanel } from "@/components/EncodingPanel";
 import { NetworkPanel } from "@/components/NetworkPanel";
 import { UserManagementView } from "@/components/UserManagementView";
 import { MonitorView } from "@/components/MonitorView";
+import { SmartStreamView } from "@/components/SmartStreamView";
 import { getAuthToken, isAuthenticated } from "@/lib/auth";
 import { fetchMyDevices, updateDeviceName, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
 
