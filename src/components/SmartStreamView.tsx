@@ -9,14 +9,23 @@ import {
   RotateCcw,
   Check,
   Copy,
+  Sparkles,
+  Wand2,
+  Cloud,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BackendDevice } from "@/lib/device-api";
 
 export type PushType = "srt" | "rtsp" | "rtmp";
+export type AiTaskType = "ai_enhance" | "smart_hd" | "cloud_record";
+export type TaskType = PushType | AiTaskType;
+
+const PUSH_TYPES: PushType[] = ["srt", "rtsp", "rtmp"];
+const AI_TYPES: AiTaskType[] = ["ai_enhance", "smart_hd", "cloud_record"];
+const isPushType = (t: TaskType): t is PushType => (PUSH_TYPES as string[]).includes(t);
 
 interface PushSlot {
-  type: PushType;
+  type: TaskType;
   url: string;
   latencyMs?: number;
 }
@@ -26,10 +35,13 @@ const SRT_PULL = `srt://${SMUX_SERVER.host}:9000?streamid=pull`;
 const RTSP_PULL = `rtsp://${SMUX_SERVER.host}:8554/live`;
 const SLOT_COUNT = 4;
 
-const PUSH_META: Record<PushType, { label: string; Icon: typeof Upload; placeholder: string }> = {
+const PUSH_META: Record<TaskType, { label: string; Icon: typeof Upload; placeholder: string }> = {
   srt: { label: "SRT Push", Icon: Upload, placeholder: "srt://host:port?streamid=xxx" },
   rtsp: { label: "RTSP Push", Icon: Upload, placeholder: "rtsp://host:port/path" },
   rtmp: { label: "RTMP Push", Icon: Upload, placeholder: "rtmp://host/app/stream" },
+  ai_enhance: { label: "AI画质增强", Icon: Sparkles, placeholder: "" },
+  smart_hd: { label: "智感高清", Icon: Wand2, placeholder: "" },
+  cloud_record: { label: "云收录", Icon: Cloud, placeholder: "" },
 };
 
 type Pipeline = {
