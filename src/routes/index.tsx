@@ -247,6 +247,12 @@ function Dashboard() {
                     online={deviceOnline}
                   />
                 </>
+              ) : activeView === "smartstream" ? (
+                <div className="row-span-2 min-h-0">
+                  <SmartStreamView
+                    devices={selectedDevice ? [selectedDevice] : []}
+                  />
+                </div>
               ) : (
                 <div className="row-span-2 min-h-0">
                   <MonitorView devices={devices} />
