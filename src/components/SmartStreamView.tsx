@@ -252,10 +252,10 @@ export function SmartStreamView({
                     <div
                       key={i}
                       className={cn(
-                        "group flex items-center justify-between gap-2 rounded-md border bg-card/60 px-3 py-2 min-w-[260px] transition-colors",
+                        "group flex items-center justify-between gap-2 rounded-md border-2 bg-card/60 px-3 py-2 min-w-[260px] transition-colors",
                         selectedNode === `slot-${i}`
-                          ? "border-primary/70 bg-primary/10"
-                          : "border-border hover:border-primary/40",
+                          ? "border-primary bg-primary/10"
+                          : "border-primary/50 hover:border-primary",
                       )}
                       onClick={() => !isEditing && setSelectedNode(`slot-${i}`)}
                     >
@@ -330,10 +330,10 @@ export function SmartStreamView({
                       handleDrop(i);
                     }}
                     className={cn(
-                      "flex items-center justify-center gap-2 rounded-md border border-dashed px-3 py-2 min-w-[260px] text-[11px] transition-colors",
+                      "flex items-center justify-center gap-2 rounded-md border-2 border-dashed px-3 py-2 min-w-[260px] text-[11px] transition-colors",
                       isHover
                         ? "border-primary bg-primary/10 text-primary"
-                        : "border-border/70 text-muted-foreground hover:border-primary/40",
+                        : "border-primary/40 text-muted-foreground hover:border-primary/70",
                     )}
                   >
                     <span className="opacity-70">空槽 {i + 1} · 拖入推流</span>
@@ -368,10 +368,10 @@ function PipelineNode({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex flex-col items-center gap-1.5 rounded-md border bg-card/60 px-4 py-3 min-w-[160px] transition-colors cursor-pointer",
+        "flex flex-col items-center gap-1.5 rounded-md border-2 bg-card/60 px-4 py-3 min-w-[160px] transition-colors cursor-pointer",
         active
-          ? "border-primary/70 bg-primary/10 shadow-[0_0_0_1px_var(--color-primary)]"
-          : "border-border hover:border-primary/50",
+          ? "border-primary bg-primary/10 shadow-[0_0_0_1px_var(--color-primary)]"
+          : "border-primary/50 hover:border-primary",
       )}
     >
       <div
@@ -408,10 +408,10 @@ function FixedNode({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex items-center gap-2 rounded-md border bg-card/60 px-3 py-2 min-w-[260px] text-left transition-colors",
+        "flex items-center gap-2 rounded-md border-2 bg-card/60 px-3 py-2 min-w-[260px] text-left transition-colors",
         active
-          ? "border-primary/70 bg-primary/10"
-          : "border-border hover:border-primary/40",
+          ? "border-primary bg-primary/10"
+          : "border-primary/50 hover:border-primary",
       )}
     >
       <div className="text-primary shrink-0">{icon}</div>
