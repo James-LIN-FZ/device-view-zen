@@ -208,32 +208,41 @@ export function SmartStreamView({
 
       {/* Pipeline area */}
       <div className="relative flex-1 min-h-0 overflow-auto p-4 flex items-center justify-center">
-        {/* Draggable push palette pinned to top-left */}
-        <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5">
-          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">拖拽添加任务</span>
-          {(Object.keys(PUSH_META) as PushType[]).map((t) => {
-            const { label, Icon } = PUSH_META[t];
-            return (
-              <div
-                key={t}
-                draggable
-                onDragStart={(e) => {
-                  setDragType(t);
-                  e.dataTransfer.effectAllowed = "copy";
-                  e.dataTransfer.setData("text/plain", t);
-                }}
-                onDragEnd={() => {
-                  setDragType(null);
-                  setHoverSlot(null);
-                }}
-                className="flex items-center gap-1.5 rounded-md border border-border bg-card/80 backdrop-blur px-2 py-1 text-[11px] cursor-grab active:cursor-grabbing hover:border-primary/60 hover:bg-primary/10 transition-colors"
-                title={`拖拽 ${label} 到空槽`}
-              >
-                <Icon className="h-3.5 w-3.5 text-primary" />
-                <span>{label}</span>
-              </div>
-            );
-          })}
+        {/* Draggable task palette pinned to top-left — two columns */}
+        <div className="absolute top-3 left-3 z-10 flex gap-3">
+          {[
+            { title: "推流任务", types: PUSH_TYPES as TaskType[] },
+            { title: "AI 任务", types: AI_TYPES as TaskType[] },
+          ].map((col) => (
+            <div key={col.title} className="flex flex-col gap-1.5">
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                {col.title}
+              </span>
+              {col.types.map((t) => {
+                const { label, Icon } = PUSH_META[t];
+                return (
+                  <div
+                    key={t}
+                    draggable
+                    onDragStart={(e) => {
+                      setDragType(t);
+                      e.dataTransfer.effectAllowed = "copy";
+                      e.dataTransfer.setData("text/plain", t);
+                    }}
+                    onDragEnd={() => {
+                      setDragType(null);
+                      setHoverSlot(null);
+                    }}
+                    className="flex items-center gap-1.5 rounded-md border border-border bg-card/80 backdrop-blur px-2 py-1 text-[11px] cursor-grab active:cursor-grabbing hover:border-primary/60 hover:bg-primary/10 transition-colors"
+                    title={`拖拽 ${label} 到空槽`}
+                  >
+                    <Icon className="h-3.5 w-3.5 text-primary" />
+                    <span>{label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
 
 
