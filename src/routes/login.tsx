@@ -7,8 +7,8 @@ import { login } from "@/lib/auth";
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
-      { title: "登录 — 视频传输设备管理平台" },
-      { name: "description", content: "登录视频传输设备管理平台" },
+      { title: "登录 — UBS-Mux" },
+      { name: "description", content: "登录 UBS-Mux 视频传输设备管理平台" },
     ],
   }),
   component: LoginPage,
@@ -43,11 +43,9 @@ function LoginPage() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md panel p-8 glow-primary">
         <div className="flex items-center gap-3 mb-8">
-          <div className="h-10 w-10 rounded-md bg-primary/15 border border-primary/40 flex items-center justify-center">
-            <Radio className="h-5 w-5 text-primary" />
-          </div>
+          <BrandLogo size={40} />
           <div>
-            <h1 className="text-lg font-semibold tracking-wide">VTX Console</h1>
+            <h1 className="text-lg font-semibold tracking-wide">UBS-Mux</h1>
             <p className="text-xs text-muted-foreground">视频传输设备管理平台</p>
           </div>
         </div>
