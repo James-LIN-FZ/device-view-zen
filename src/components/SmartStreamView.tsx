@@ -90,9 +90,10 @@ export function SmartStreamView({
     setDragType(null);
     setEditingSlot(idx);
     setEditingUrl("");
+    setEditingLatency(type === "srt" ? "120" : "");
     setDraft((prev) => {
       const next = { slots: [...prev.slots] };
-      next.slots[idx] = { type, url: "" };
+      next.slots[idx] = { type, url: "", ...(type === "srt" ? { latencyMs: 120 } : {}) };
       return next;
     });
   };
@@ -102,11 +103,19 @@ export function SmartStreamView({
     setDraft((prev) => {
       const next = { slots: [...prev.slots] };
       const cur = next.slots[editingSlot];
-      if (cur) next.slots[editingSlot] = { ...cur, url: editingUrl.trim() };
+      if (cur) {
+        const updated: PushSlot = { ...cur, url: editingUrl.trim() };
+        if (cur.type === "srt") {
+          const n = parseInt(editingLatency, 10);
+          updated.latencyMs = Number.isFinite(n) && n >= 0 ? n : 120;
+        }
+        next.slots[editingSlot] = updated;
+      }
       return next;
     });
     setEditingSlot(null);
     setEditingUrl("");
+    setEditingLatency("");
   };
 
   const cancelEdit = () => {
