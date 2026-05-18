@@ -404,10 +404,10 @@ function PipelineNode({
     >
       <div
         className={cn(
-          "h-10 w-10 rounded-full flex items-center justify-center border",
+          "h-10 w-10 rounded-full flex items-center justify-center border-2",
           tone === "offline"
             ? "border-border bg-muted/30 text-muted-foreground"
-            : "border-primary/40 bg-primary/10 text-primary",
+            : "border-primary bg-primary text-primary-foreground",
         )}
       >
         {icon}
