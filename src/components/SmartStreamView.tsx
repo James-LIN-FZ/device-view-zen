@@ -59,7 +59,7 @@ export function SmartStreamView({
 }) {
   const [pipelines, setPipelines] = useState<Record<string, Pipeline>>({});
   const [draft, setDraft] = useState<Pipeline>(emptyPipeline());
-  const [dragType, setDragType] = useState<PushType | null>(null);
+  const [dragType, setDragType] = useState<TaskType | null>(null);
   const [hoverSlot, setHoverSlot] = useState<number | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
