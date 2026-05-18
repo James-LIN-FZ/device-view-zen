@@ -9,7 +9,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { getAuthToken } from "@/lib/auth";
 
 const CHART_COLOR = "var(--color-primary)";
 const GRID_COLOR = "var(--color-grid-line)";
@@ -19,11 +18,6 @@ const DISPLAY_NIC_COUNT = 8;
 
 type Sample = { t: number; up: number; down: number };
 type NicRealtime = { name: string; type: string; up: number; down: number };
-type WsStatusMessage = {
-  type?: string;
-  payload?: unknown;
-  online?: boolean;
-};
 
 function makeInitial(): Sample[] {
   const now = Date.now();
@@ -32,14 +26,6 @@ function makeInitial(): Sample[] {
     up: 0,
     down: 0,
   }));
-}
-
-function getWsBaseUrl(): string {
-  const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
-  const httpBase = (configured?.trim() || "http://127.0.0.1:18081").replace(/\/$/, "");
-  if (httpBase.startsWith("https://")) return `wss://${httpBase.slice(8)}`;
-  if (httpBase.startsWith("http://")) return `ws://${httpBase.slice(7)}`;
-  return httpBase;
 }
 
 function asNumber(value: unknown): number | null {
@@ -139,7 +125,7 @@ function makeDisplayNics(liveNics: NicRealtime[]): NicRealtime[] {
   );
 }
 
-export function NetworkPanel({ serialNo, online }: { serialNo: string; online: boolean }) {
+export function NetworkPanel({ serialNo, online, payload }: { serialNo: string; online: boolean; payload: unknown }) {
   const [onlineState, setOnlineState] = useState(online);
   const [liveNics, setLiveNics] = useState<NicRealtime[]>([]);
   const displayNics = makeDisplayNics(liveNics);
@@ -163,30 +149,8 @@ export function NetworkPanel({ serialNo, online }: { serialNo: string; online: b
   }, [displayNics]);
 
   useEffect(() => {
-    if (!serialNo) return;
-    const token = getAuthToken();
-    if (!token) return;
-
-    const ws = new WebSocket(`${getWsBaseUrl()}/api/ws/devices/${encodeURIComponent(serialNo)}?token=${encodeURIComponent(token)}`);
-
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(String(event.data)) as WsStatusMessage;
-        if (typeof msg.online === "boolean") {
-          setOnlineState(msg.online);
-        }
-        if (msg.type !== "network") return;
-        const parsed = parseNetworkPayload(msg.payload);
-        setLiveNics(parsed);
-      } catch {
-        // Ignore malformed messages to keep the panel stable.
-      }
-    };
-
-    return () => {
-      ws.close();
-    };
-  }, [serialNo]);
+    setLiveNics(parseNetworkPayload(payload));
+  }, [payload]);
 
   useEffect(() => {
     const id = setInterval(() => {

@@ -166,3 +166,122 @@ export async function fetchDeviceStatus(serialNo: string): Promise<BackendDevice
 
   return (await response.json()) as BackendDeviceStatusData;
 }
+
+export interface DeviceRPCSyncRequest {
+  method?: string;
+  path: string;
+  body?: unknown;
+}
+
+export interface DeviceRPCAck {
+  requestId: string;
+  status: string;
+  timeoutSeconds: number;
+}
+
+export interface DeviceRPCReply {
+  requestId: string;
+  status: string;
+  method: string;
+  path: string;
+  data?: unknown;
+  error?: string;
+  timestamp: string;
+}
+
+export async function fetchDeviceNetwork(serialNo: string): Promise<unknown | null> {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error("missing auth token");
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/api/devices/${encodeURIComponent(serialNo)}/network`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (response.status === 401) {
+    throw new Error("unauthorized");
+  }
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error("获取网络状态失败");
+  }
+
+  return (await response.json()) as unknown;
+}
+
+export async function requestDeviceRPC(serialNo: string, request: DeviceRPCSyncRequest): Promise<DeviceRPCAck> {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error("missing auth token");
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/api/devices/${encodeURIComponent(serialNo)}/rpc`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (response.status === 401) {
+    throw new Error("unauthorized");
+  }
+
+  if (!response.ok) {
+    let message = "发起设备RPC请求失败";
+    try {
+      const body = (await response.json()) as { error?: string };
+      if (body.error) message = body.error;
+    } catch {
+      // Keep fallback message.
+    }
+    throw new Error(message);
+  }
+
+  return (await response.json()) as DeviceRPCAck;
+}
+
+export async function fetchDeviceRPCReply(serialNo: string, requestId: string): Promise<DeviceRPCReply | null> {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error("missing auth token");
+  }
+
+  const response = await fetch(
+    `${getApiBaseUrl()}/api/devices/${encodeURIComponent(serialNo)}/rpc/${encodeURIComponent(requestId)}/reply`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  if (response.status === 401) {
+    throw new Error("unauthorized");
+  }
+
+  if (response.status === 404 || response.status === 202) {
+    return null;
+  }
+
+  if (!response.ok) {
+    let message = "获取RPC返回值失败";
+    try {
+      const body = (await response.json()) as { error?: string };
+      if (body.error) message = body.error;
+    } catch {
+      // Keep fallback message.
+    }
+    throw new Error(message);
+  }
+
+  return (await response.json()) as DeviceRPCReply;
+}

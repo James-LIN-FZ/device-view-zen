@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { TopBar } from "@/components/TopBar";
 import { DeviceList } from "@/components/DeviceList";
 import { ViewSwitcher, type ViewKey } from "@/components/ViewSwitcher";
@@ -9,12 +9,20 @@ import { UserManagementView } from "@/components/UserManagementView";
 import { MonitorView } from "@/components/MonitorView";
 import { SmartStreamView } from "@/components/SmartStreamView";
 import { getAuthToken, isAuthenticated } from "@/lib/auth";
-import { fetchMyDevices, updateDeviceName, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
+import { fetchDeviceNetwork, fetchDeviceStatus, fetchMyDevices, updateDeviceName, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
 
 type DeviceWsMessage = {
   type?: string;
   payload?: unknown;
   online?: boolean;
+};
+
+type RPCNoticePayload = {
+  requestId?: string;
+  status?: string;
+  path?: string;
+  method?: string;
+  timestamp?: string;
 };
 
 function getWsBaseUrl(): string {
@@ -23,11 +31,6 @@ function getWsBaseUrl(): string {
   if (httpBase.startsWith("https://")) return `wss://${httpBase.slice(8)}`;
   if (httpBase.startsWith("http://")) return `ws://${httpBase.slice(7)}`;
   return httpBase;
-}
-
-function toStatusPayload(value: unknown): BackendDeviceStatusData | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as BackendDeviceStatusData;
 }
 
 export const Route = createFileRoute("/")({
@@ -41,6 +44,9 @@ export const Route = createFileRoute("/")({
 });
 
 function Dashboard() {
+  const STATUS_FETCH_MIN_INTERVAL_MS = 2000;
+  const NETWORK_FETCH_MIN_INTERVAL_MS = 1000;
+
   const navigate = useNavigate();
   const [devices, setDevices] = useState<BackendDevice[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -48,7 +54,15 @@ function Dashboard() {
   const [error, setError] = useState("");
   const [deviceStatus, setDeviceStatus] = useState<BackendDeviceStatusData | null>(null);
   const [deviceOnline, setDeviceOnline] = useState<boolean>(false);
+  const [networkPayload, setNetworkPayload] = useState<unknown>(null);
+  const [rpcNotice, setRPCNotice] = useState<RPCNoticePayload | null>(null);
   const [activeView, setActiveView] = useState<ViewKey>("control");
+  const statusFetchTimerRef = useRef<number | null>(null);
+  const networkFetchTimerRef = useRef<number | null>(null);
+  const statusLoadingRef = useRef(false);
+  const networkLoadingRef = useRef(false);
+  const lastStatusFetchAtRef = useRef(0);
+  const lastNetworkFetchAtRef = useRef(0);
 
   const selectedDevice = useMemo(
     () => devices.find((device) => device.serialNo === selectedId) ?? null,
@@ -69,6 +83,7 @@ function Dashboard() {
       .then((items) => {
         if (!active) return;
         setDevices(items);
+        setDeviceOnline(items[0]?.online ?? false);
         setSelectedId((current) => current || items[0]?.serialNo || "");
       })
       .catch((err) => {
@@ -114,6 +129,7 @@ function Dashboard() {
 
         setSelectedId((current) => {
           if (current && items.some((item) => item.serialNo === current)) return current;
+          setDeviceOnline(items[0]?.online ?? false);
           return items[0]?.serialNo || "";
         });
       } catch (err) {
@@ -136,23 +152,78 @@ function Dashboard() {
   }, [navigate]);
 
   useEffect(() => {
-    setDeviceOnline(selectedDevice?.online ?? false);
-  }, [selectedDevice?.online, selectedId]);
-
-  useEffect(() => {
     if (!selectedId) {
       setDeviceStatus(null);
       setDeviceOnline(false);
+      setNetworkPayload(null);
+      setRPCNotice(null);
       return;
     }
 
     setDeviceStatus(null);
+    setNetworkPayload(null);
+    setRPCNotice(null);
 
     const token = getAuthToken();
     if (!token) {
       navigate({ to: "/login" });
       return;
     }
+
+    const loadStatus = async () => {
+      if (statusLoadingRef.current) return;
+      statusLoadingRef.current = true;
+      lastStatusFetchAtRef.current = Date.now();
+      try {
+        const nextStatus = await fetchDeviceStatus(selectedId);
+        setDeviceStatus(nextStatus);
+      } catch {
+        // Keep previous status on transient fetch errors.
+      } finally {
+        statusLoadingRef.current = false;
+      }
+    };
+
+    const loadNetwork = async () => {
+      if (networkLoadingRef.current) return;
+      networkLoadingRef.current = true;
+      lastNetworkFetchAtRef.current = Date.now();
+      try {
+        const nextNetwork = await fetchDeviceNetwork(selectedId);
+        setNetworkPayload(nextNetwork);
+      } catch {
+        // Keep previous network snapshot on transient fetch errors.
+      } finally {
+        networkLoadingRef.current = false;
+      }
+    };
+
+    if (deviceOnline) {
+      void loadStatus();
+      void loadNetwork();
+    }
+
+    const scheduleStatusFetch = () => {
+      const elapsed = Date.now() - lastStatusFetchAtRef.current;
+      const delay = Math.max(0, STATUS_FETCH_MIN_INTERVAL_MS - elapsed);
+      if (statusFetchTimerRef.current != null) {
+        window.clearTimeout(statusFetchTimerRef.current);
+      }
+      statusFetchTimerRef.current = window.setTimeout(() => {
+        void loadStatus();
+      }, delay);
+    };
+
+    const scheduleNetworkFetch = () => {
+      const elapsed = Date.now() - lastNetworkFetchAtRef.current;
+      const delay = Math.max(0, NETWORK_FETCH_MIN_INTERVAL_MS - elapsed);
+      if (networkFetchTimerRef.current != null) {
+        window.clearTimeout(networkFetchTimerRef.current);
+      }
+      networkFetchTimerRef.current = window.setTimeout(() => {
+        void loadNetwork();
+      }, delay);
+    };
 
     const ws = new WebSocket(
       `${getWsBaseUrl()}/api/ws/devices/${encodeURIComponent(selectedId)}?token=${encodeURIComponent(token)}`,
@@ -161,7 +232,7 @@ function Dashboard() {
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(String(event.data)) as DeviceWsMessage;
-        if (typeof msg.online === "boolean") {
+        if (msg.type !== "rpc.reply" && typeof msg.online === "boolean") {
           setDeviceOnline(msg.online);
           setDevices((current) =>
             current.map((item) =>
@@ -170,10 +241,26 @@ function Dashboard() {
           );
         }
 
-        if (msg.type !== "codec") return;
-        const nextStatus = toStatusPayload(msg.payload);
-        if (!nextStatus) return;
-        setDeviceStatus(nextStatus);
+        const eventOnline = typeof msg.online === "boolean" ? msg.online : deviceOnline;
+        if (!eventOnline) {
+          return;
+        }
+
+        if (msg.type === "codec" || msg.type === "presence") {
+          scheduleStatusFetch();
+          return;
+        }
+
+        if (msg.type === "network") {
+          scheduleNetworkFetch();
+          return;
+        }
+
+        if (msg.type === "rpc.reply") {
+          if (msg.payload && typeof msg.payload === "object") {
+            setRPCNotice(msg.payload as RPCNoticePayload);
+          }
+        }
       } catch {
         // Ignore malformed messages and keep current UI state.
       }
@@ -184,6 +271,14 @@ function Dashboard() {
     };
 
     return () => {
+      if (statusFetchTimerRef.current != null) {
+        window.clearTimeout(statusFetchTimerRef.current);
+        statusFetchTimerRef.current = null;
+      }
+      if (networkFetchTimerRef.current != null) {
+        window.clearTimeout(networkFetchTimerRef.current);
+        networkFetchTimerRef.current = null;
+      }
       ws.close();
     };
   }, [navigate, selectedId]);
@@ -211,6 +306,7 @@ function Dashboard() {
                   selectedId={selectedId}
                   onSelect={(device) => {
                     setSelectedId(device.serialNo);
+                    setDeviceOnline(device.online);
                   }}
                   onRename={async (device, nextName) => {
                     try {
@@ -238,13 +334,16 @@ function Dashboard() {
               {activeView === "control" ? (
                 <>
                   <EncodingPanel
+                    serialNo={selectedId}
                     deviceName={selectedDevice?.name?.trim() || "未命名设备"}
                     online={deviceOnline}
                     status={deviceStatus}
+                    rpcNotice={rpcNotice}
                   />
                   <NetworkPanel
                     serialNo={selectedId}
                     online={deviceOnline}
+                    payload={networkPayload}
                   />
                 </>
               ) : activeView === "smartstream" ? (

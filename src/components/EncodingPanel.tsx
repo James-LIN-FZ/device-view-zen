@@ -1,14 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, Video, Settings2, Save, Play, Square, RefreshCw, X } from "lucide-react";
-import type { BackendDeviceStatusData } from "@/lib/device-api";
+import { fetchDeviceRPCReply, requestDeviceRPC, type BackendDeviceStatusData } from "@/lib/device-api";
 
-const ENCODE_TASKS = [
-  "直播推流 - 主任务",
-  "录制存档 - 本地",
-  "低延迟回传",
-  "多码率转码",
-  "应急备播",
-];
+const DEFAULT_ENCODE_TASKS: string[] = [];
 
 type EncodingForm = {
   videoSource: string;
@@ -29,6 +23,40 @@ const EMPTY_FORM: EncodingForm = {
   resolution: "--",
   streamUrl: "--",
 };
+
+type RPCNoticePayload = {
+  requestId?: string;
+  status?: string;
+  path?: string;
+};
+
+function parseEncodeTasks(payload: unknown): string[] {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+  const tasks = payload
+    .map((item, index) => {
+      if (!item || typeof item !== "object") {
+        return "";
+      }
+      const row = item as Record<string, unknown>;
+      const name =
+        (typeof row.sName === "string" && row.sName.trim()) ||
+        (typeof row.name === "string" && row.name.trim()) ||
+        (typeof row.title === "string" && row.title.trim()) ||
+        "";
+      if (name) {
+        return name;
+      }
+      const id = row.id;
+      if (typeof id === "string" || typeof id === "number") {
+        return `任务 ${id}`;
+      }
+      return `任务 ${index + 1}`;
+    })
+    .filter((name) => !!name);
+  return Array.from(new Set(tasks));
+}
 
 function normalizeVideoSource(value?: string): string {
   if (!value) return "--";
@@ -105,10 +133,16 @@ function isNoSignal(status: BackendDeviceStatusData | null | undefined): boolean
   if (!status) return true;
   const codecRes = (status.sVideoCodec?.sResolution || "").trim().toLowerCase();
   const paramsRes = (status.sVideoParams?.sResolution || "").trim().toLowerCase();
-  const resolutionText = `${codecRes} ${paramsRes}`;
+  const resolutionText = `${codecRes} ${paramsRes}`.trim();
   if (resolutionText.includes("nosignal") || resolutionText.includes("no signal")) {
     return true;
   }
+
+  // Some devices only report symbolic resolution (for example 1080p50) while width/height stay 0.
+  if (/\b\d{3,4}p\d{2}\b/i.test(resolutionText) || /\b\d{3,4}\s*[x×]\s*\d{3,4}\b/i.test(resolutionText)) {
+    return false;
+  }
+
   const width = status.sVideoCodec?.iWidth || status.sVideoParams?.iWidth || 0;
   const height = status.sVideoCodec?.iHeight || status.sVideoParams?.iHeight || 0;
   return width <= 0 || height <= 0;
@@ -156,19 +190,25 @@ function buildForm(status: BackendDeviceStatusData | null | undefined): Encoding
 }
 
 export function EncodingPanel({
+  serialNo,
   deviceName,
   online,
   status,
+  rpcNotice,
 }: {
+  serialNo: string;
   deviceName: string;
   online: boolean;
   status: BackendDeviceStatusData | null;
+  rpcNotice: RPCNoticePayload | null;
 }) {
   const fallbackCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [form, setForm] = useState<EncodingForm>(() => buildForm(status));
   const [bitrateNum, setBitrateNum] = useState(() => parseVideoBitrate(status) || 8);
   const [latency, setLatency] = useState(500);
-  const [task, setTask] = useState(ENCODE_TASKS[0]);
+  const [encodeTasks, setEncodeTasks] = useState<string[]>(DEFAULT_ENCODE_TASKS);
+  const [taskLoading, setTaskLoading] = useState(false);
+  const [task, setTask] = useState("");
   const [running, setRunning] = useState(false);
   const [localRecordingEnabled, setLocalRecordingEnabled] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -176,11 +216,58 @@ export function EncodingPanel({
   const [previewNonce, setPreviewNonce] = useState(0);
   const [previewLoadFailed, setPreviewLoadFailed] = useState(false);
   const [webrtcNonce, setWebrtcNonce] = useState(0);
+  const pendingRequestIdRef = useRef("");
+  const pollTimerRef = useRef<number | null>(null);
+  const timeoutTimerRef = useRef<number | null>(null);
+
+  const clearReplyTimers = () => {
+    if (pollTimerRef.current != null) {
+      window.clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    if (timeoutTimerRef.current != null) {
+      window.clearTimeout(timeoutTimerRef.current);
+      timeoutTimerRef.current = null;
+    }
+  };
+
+  const applyReplyResult = (statusValue: string, data: unknown) => {
+    if (statusValue !== "ok") {
+      setEncodeTasks(DEFAULT_ENCODE_TASKS);
+      return true;
+    }
+    const parsedTasks = parseEncodeTasks(data);
+    setEncodeTasks(parsedTasks.length > 0 ? parsedTasks : DEFAULT_ENCODE_TASKS);
+    return true;
+  };
+
+  const fetchReplyByID = async (requestId: string): Promise<boolean> => {
+    if (!serialNo || !requestId) {
+      return false;
+    }
+    const reply = await fetchDeviceRPCReply(serialNo, requestId);
+    if (!reply) {
+      return false;
+    }
+    if ((reply.path || "").trim() !== "/encode") {
+      return false;
+    }
+    if (reply.status === "pending") {
+      return false;
+    }
+    const done = applyReplyResult(reply.status, reply.data);
+    if (done) {
+      pendingRequestIdRef.current = "";
+      setTaskLoading(false);
+      clearReplyTimers();
+    }
+    return done;
+  };
 
   const resetEditPanel = () => {
     setLatency(500);
     setBitrateNum(parseVideoBitrate(status) || 8);
-    setTask(ENCODE_TASKS[0]);
+    setTask(encodeTasks[0] || DEFAULT_ENCODE_TASKS[0]);
     setRunning(false);
     setLocalRecordingEnabled(false);
     setDirty(false);
@@ -191,6 +278,104 @@ export function EncodingPanel({
     setBitrateNum(parseVideoBitrate(status) || 8);
     setDirty(false);
   }, [status]);
+
+  useEffect(() => {
+    if (encodeTasks.length === 0) {
+      return;
+    }
+    if (!encodeTasks.includes(task)) {
+      setTask(encodeTasks[0]);
+    }
+  }, [encodeTasks, task]);
+
+  useEffect(() => {
+    if (!serialNo) {
+      setEncodeTasks(DEFAULT_ENCODE_TASKS);
+      setTask("");
+      setTaskLoading(false);
+      pendingRequestIdRef.current = "";
+      clearReplyTimers();
+      return;
+    }
+    if (!online) {
+      setEncodeTasks(DEFAULT_ENCODE_TASKS);
+      setTask("");
+      setTaskLoading(false);
+      pendingRequestIdRef.current = "";
+      clearReplyTimers();
+      return;
+    }
+
+    let active = true;
+    pendingRequestIdRef.current = "";
+    clearReplyTimers();
+    setTaskLoading(true);
+
+    requestDeviceRPC(serialNo, { method: "GET", path: "/encode" })
+      .then((ack) => {
+        if (!active) {
+          return;
+        }
+        const requestId = (ack.requestId || "").trim();
+        if (!requestId) {
+          setTaskLoading(false);
+          return;
+        }
+        pendingRequestIdRef.current = requestId;
+
+        const poll = async () => {
+          if (!pendingRequestIdRef.current || pendingRequestIdRef.current !== requestId) {
+            return;
+          }
+          try {
+            await fetchReplyByID(requestId);
+          } catch {
+            // Keep waiting until timeout.
+          }
+        };
+
+        void poll();
+        pollTimerRef.current = window.setInterval(() => {
+          void poll();
+        }, 5000);
+        timeoutTimerRef.current = window.setTimeout(() => {
+          if (pendingRequestIdRef.current !== requestId) {
+            return;
+          }
+          pendingRequestIdRef.current = "";
+          clearReplyTimers();
+          setTaskLoading(false);
+          setEncodeTasks(DEFAULT_ENCODE_TASKS);
+        }, 15000);
+      })
+      .catch(() => {
+        if (!active) {
+          return;
+        }
+        setEncodeTasks(DEFAULT_ENCODE_TASKS);
+        setTaskLoading(false);
+      });
+
+    return () => {
+      active = false;
+      pendingRequestIdRef.current = "";
+      clearReplyTimers();
+    };
+  }, [online, serialNo]);
+
+  useEffect(() => {
+    if (!rpcNotice || !serialNo) {
+      return;
+    }
+    const requestId = (rpcNotice.requestId || "").trim();
+    if (!requestId || requestId !== pendingRequestIdRef.current) {
+      return;
+    }
+    if ((rpcNotice.path || "").trim() !== "/encode") {
+      return;
+    }
+    void fetchReplyByID(requestId);
+  }, [rpcNotice, serialNo]);
 
   const noSignal = online ? isNoSignal(status) : true;
   const previewBaseUrl = useMemo(() => getPreviewBaseUrl(form.streamUrl), [form.streamUrl]);
@@ -247,7 +432,14 @@ export function EncodingPanel({
       ctx.fillRect(0, y, w, 1);
     }
 
-    const label = online ? "No Signal" : "Device Offline";
+    let label = "No Signal";
+    if (!online) {
+      label = "Device Offline";
+    } else if (!noSignal && !previewBaseUrl) {
+      label = "Preview Not Configured";
+    } else if (!noSignal && previewLoadFailed) {
+      label = "Preview Unavailable";
+    }
     ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
     ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = "#f3f6ff";
@@ -255,7 +447,7 @@ export function EncodingPanel({
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(label, w / 2, h / 2);
-  }, [canShowPreview, previewLoadFailed, online, deviceName]);
+  }, [canShowPreview, previewLoadFailed, online, noSignal, previewBaseUrl, deviceName]);
 
   const live = online;
   const realtimeBitrate = status?.sVideoCodec?.sActBitrate || "--";
@@ -467,7 +659,8 @@ export function EncodingPanel({
               <Save className="h-3 w-3" /> 应用
             </button>
             <Field label="编码任务">
-              <Select value={task} onChange={(v) => { setTask(v); setDirty(true); }} options={ENCODE_TASKS} />
+              <Select value={task} onChange={(v) => { setTask(v); setDirty(true); }} options={encodeTasks} />
+              {taskLoading ? <div className="mt-1 text-[10px] text-muted-foreground">后台同步任务中...</div> : null}
             </Field>
             <button
               onClick={() => setRunning((r) => !r)}
