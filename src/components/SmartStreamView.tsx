@@ -193,13 +193,13 @@ export function SmartStreamView({
       </div>
 
       {/* Pipeline area */}
-      <div className="flex-1 min-h-0 overflow-auto p-4">
+      <div className="flex-1 min-h-0 overflow-auto p-4 flex items-center justify-center">
         {!device ? (
-          <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+          <div className="text-xs text-muted-foreground">
             请从左侧选择一个设备查看智流 pipeline
           </div>
         ) : (
-          <div className="flex items-start gap-3 min-w-max">
+          <div className="flex items-center gap-3 min-w-max mx-auto">
             {/* Device node */}
             <PipelineNode
               icon={<HardDrive className="h-5 w-5" />}
@@ -426,24 +426,52 @@ function FixedNode({
 
 function Connector() {
   return (
-    <div className="self-stretch flex items-center">
-      <div className="h-px w-8 bg-border" />
+    <div className="flex items-center" aria-hidden>
+      <svg width="36" height="12" className="overflow-visible">
+        <line
+          x1="0"
+          y1="6"
+          x2="36"
+          y2="6"
+          stroke="var(--color-primary)"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+      </svg>
     </div>
   );
 }
 
 function BranchConnector({ count }: { count: number }) {
+  const rowH = 44;
+  const height = count * rowH;
+  const mid = height / 2;
   return (
-    <div className="self-stretch flex items-center" aria-hidden>
-      <svg width="36" height={count * 44} className="overflow-visible">
-        <path
-          d={`M0 ${(count * 44) / 2} H18 M18 22 V${count * 44 - 22} ${Array.from({ length: count })
-            .map((_, i) => `M18 ${22 + i * 44} H36`)
-            .join(" ")}`}
-          stroke="var(--color-border)"
-          strokeWidth="1"
-          fill="none"
+    <div className="flex items-center" aria-hidden>
+      <svg width="40" height={height} className="overflow-visible">
+        <line x1="0" y1={mid} x2="20" y2={mid} stroke="var(--color-primary)" strokeWidth="2.5" strokeLinecap="round" />
+        <line
+          x1="20"
+          y1={rowH / 2}
+          x2="20"
+          y2={height - rowH / 2}
+          stroke="var(--color-primary)"
+          strokeWidth="2.5"
+          strokeLinecap="round"
         />
+        {Array.from({ length: count }).map((_, i) => (
+          <line
+            key={i}
+            x1="20"
+            y1={rowH / 2 + i * rowH}
+            x2="40"
+            y2={rowH / 2 + i * rowH}
+            stroke="var(--color-primary)"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+        ))}
+        <circle cx="20" cy={mid} r="3" fill="var(--color-primary)" />
       </svg>
     </div>
   );
