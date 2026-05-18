@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Radio, Lock, User } from "lucide-react";
+import { Lock, User } from "lucide-react";
+import { BrandLogo } from "@/components/BrandLogo";
 import { login } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
