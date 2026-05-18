@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Radio, LogOut, UserCircle2 } from "lucide-react";
+import { LogOut, UserCircle2 } from "lucide-react";
 import { getAuthUser, logout as logoutRequest } from "@/lib/auth";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export function TopBar() {
   const navigate = useNavigate();
@@ -31,11 +32,9 @@ export function TopBar() {
   return (
     <header className="h-12 shrink-0 border-b border-border bg-panel flex items-center px-4 gap-5">
       <div className="flex items-center gap-2">
-        <div className="h-7 w-7 rounded-sm bg-primary/15 border border-primary/50 flex items-center justify-center">
-          <Radio className="h-3.5 w-3.5 text-primary" />
-        </div>
+        <BrandLogo size={28} />
         <div className="leading-tight">
-          <div className="text-[13px] font-semibold tracking-wide text-primary">VTX Console</div>
+          <div className="text-[13px] font-semibold tracking-wide text-primary">UBS-Mux</div>
           <div className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground">视频传输设备管理平台</div>
         </div>
       </div>

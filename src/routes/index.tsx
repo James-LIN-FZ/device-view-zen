@@ -32,7 +32,7 @@ function toStatusPayload(value: unknown): BackendDeviceStatusData | null {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "控制台 — 视频传输设备管理平台" },
+      { title: "控制台 — UBS-Mux" },
       { name: "description", content: "实时查看视频传输设备的编码状态与网络流量" },
     ],
   }),
