@@ -321,7 +321,9 @@ export function SmartStreamView({
                         <Icon className="h-4 w-4 text-primary shrink-0" />
                         <div className="min-w-0 flex-1">
                           <div className="text-[12px] font-medium leading-tight">{label}</div>
-                          {isEditing ? (
+                          {!isPushType(slot.type) ? (
+                            <div className="text-[11px] text-muted-foreground italic">已启用</div>
+                          ) : isEditing ? (
                             <div className="mt-1 space-y-1" onClick={(e) => e.stopPropagation()}>
                               <input
                                 autoFocus
