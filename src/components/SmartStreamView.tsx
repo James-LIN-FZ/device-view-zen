@@ -18,6 +18,7 @@ export type PushType = "srt" | "rtsp" | "rtmp";
 interface PushSlot {
   type: PushType;
   url: string;
+  latencyMs?: number;
 }
 
 const SMUX_SERVER = { host: "smux.local", port: 8080 };
@@ -25,9 +26,9 @@ const SRT_PULL = `srt://${SMUX_SERVER.host}:9000?streamid=pull`;
 const RTSP_PULL = `rtsp://${SMUX_SERVER.host}:8554/live`;
 const SLOT_COUNT = 4;
 
-const PUSH_META: Record<PushType, { label: string; Icon: typeof Radio; placeholder: string }> = {
-  srt: { label: "SRT Push", Icon: Radio, placeholder: "srt://host:port?streamid=xxx" },
-  rtsp: { label: "RTSP Push", Icon: Video, placeholder: "rtsp://host:port/path" },
+const PUSH_META: Record<PushType, { label: string; Icon: typeof Upload; placeholder: string }> = {
+  srt: { label: "SRT Push", Icon: Upload, placeholder: "srt://host:port?streamid=xxx" },
+  rtsp: { label: "RTSP Push", Icon: Upload, placeholder: "rtsp://host:port/path" },
   rtmp: { label: "RTMP Push", Icon: Upload, placeholder: "rtmp://host/app/stream" },
 };
 
