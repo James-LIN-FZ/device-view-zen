@@ -9,14 +9,23 @@ import {
   RotateCcw,
   Check,
   Copy,
+  Sparkles,
+  Wand2,
+  Cloud,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BackendDevice } from "@/lib/device-api";
 
 export type PushType = "srt" | "rtsp" | "rtmp";
+export type AiTaskType = "ai_enhance" | "smart_hd" | "cloud_record";
+export type TaskType = PushType | AiTaskType;
+
+const PUSH_TYPES: PushType[] = ["srt", "rtsp", "rtmp"];
+const AI_TYPES: AiTaskType[] = ["ai_enhance", "smart_hd", "cloud_record"];
+const isPushType = (t: TaskType): t is PushType => (PUSH_TYPES as string[]).includes(t);
 
 interface PushSlot {
-  type: PushType;
+  type: TaskType;
   url: string;
   latencyMs?: number;
 }
@@ -26,10 +35,13 @@ const SRT_PULL = `srt://${SMUX_SERVER.host}:9000?streamid=pull`;
 const RTSP_PULL = `rtsp://${SMUX_SERVER.host}:8554/live`;
 const SLOT_COUNT = 4;
 
-const PUSH_META: Record<PushType, { label: string; Icon: typeof Upload; placeholder: string }> = {
+const PUSH_META: Record<TaskType, { label: string; Icon: typeof Upload; placeholder: string }> = {
   srt: { label: "SRT Push", Icon: Upload, placeholder: "srt://host:port?streamid=xxx" },
   rtsp: { label: "RTSP Push", Icon: Upload, placeholder: "rtsp://host:port/path" },
   rtmp: { label: "RTMP Push", Icon: Upload, placeholder: "rtmp://host/app/stream" },
+  ai_enhance: { label: "AI画质增强", Icon: Sparkles, placeholder: "" },
+  smart_hd: { label: "智感高清", Icon: Wand2, placeholder: "" },
+  cloud_record: { label: "云收录", Icon: Cloud, placeholder: "" },
 };
 
 type Pipeline = {
@@ -47,7 +59,7 @@ export function SmartStreamView({
 }) {
   const [pipelines, setPipelines] = useState<Record<string, Pipeline>>({});
   const [draft, setDraft] = useState<Pipeline>(emptyPipeline());
-  const [dragType, setDragType] = useState<PushType | null>(null);
+  const [dragType, setDragType] = useState<TaskType | null>(null);
   const [hoverSlot, setHoverSlot] = useState<number | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
@@ -88,14 +100,23 @@ export function SmartStreamView({
     const type = dragType;
     setHoverSlot(null);
     setDragType(null);
-    setEditingSlot(idx);
-    setEditingUrl("");
-    setEditingLatency(type === "srt" ? "120" : "");
-    setDraft((prev) => {
-      const next = { slots: [...prev.slots] };
-      next.slots[idx] = { type, url: "", ...(type === "srt" ? { latencyMs: 120 } : {}) };
-      return next;
-    });
+    if (isPushType(type)) {
+      setEditingSlot(idx);
+      setEditingUrl("");
+      setEditingLatency(type === "srt" ? "120" : "");
+      setDraft((prev) => {
+        const next = { slots: [...prev.slots] };
+        next.slots[idx] = { type, url: "", ...(type === "srt" ? { latencyMs: 120 } : {}) };
+        return next;
+      });
+    } else {
+      // AI task — no URL editing needed
+      setDraft((prev) => {
+        const next = { slots: [...prev.slots] };
+        next.slots[idx] = { type, url: "" };
+        return next;
+      });
+    }
   };
 
   const commitEdit = () => {
@@ -187,32 +208,41 @@ export function SmartStreamView({
 
       {/* Pipeline area */}
       <div className="relative flex-1 min-h-0 overflow-auto p-4 flex items-center justify-center">
-        {/* Draggable push palette pinned to top-left */}
-        <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5">
-          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">拖拽添加任务</span>
-          {(Object.keys(PUSH_META) as PushType[]).map((t) => {
-            const { label, Icon } = PUSH_META[t];
-            return (
-              <div
-                key={t}
-                draggable
-                onDragStart={(e) => {
-                  setDragType(t);
-                  e.dataTransfer.effectAllowed = "copy";
-                  e.dataTransfer.setData("text/plain", t);
-                }}
-                onDragEnd={() => {
-                  setDragType(null);
-                  setHoverSlot(null);
-                }}
-                className="flex items-center gap-1.5 rounded-md border border-border bg-card/80 backdrop-blur px-2 py-1 text-[11px] cursor-grab active:cursor-grabbing hover:border-primary/60 hover:bg-primary/10 transition-colors"
-                title={`拖拽 ${label} 到空槽`}
-              >
-                <Icon className="h-3.5 w-3.5 text-primary" />
-                <span>{label}</span>
-              </div>
-            );
-          })}
+        {/* Draggable task palette pinned to top-left — two columns */}
+        <div className="absolute top-3 left-3 z-10 flex gap-3">
+          {[
+            { title: "推流任务", types: PUSH_TYPES as TaskType[] },
+            { title: "AI 任务", types: AI_TYPES as TaskType[] },
+          ].map((col) => (
+            <div key={col.title} className="flex flex-col gap-1.5">
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                {col.title}
+              </span>
+              {col.types.map((t) => {
+                const { label, Icon } = PUSH_META[t];
+                return (
+                  <div
+                    key={t}
+                    draggable
+                    onDragStart={(e) => {
+                      setDragType(t);
+                      e.dataTransfer.effectAllowed = "copy";
+                      e.dataTransfer.setData("text/plain", t);
+                    }}
+                    onDragEnd={() => {
+                      setDragType(null);
+                      setHoverSlot(null);
+                    }}
+                    className="flex items-center gap-1.5 rounded-md border border-border bg-card/80 backdrop-blur px-2 py-1 text-[11px] cursor-grab active:cursor-grabbing hover:border-primary/60 hover:bg-primary/10 transition-colors"
+                    title={`拖拽 ${label} 到空槽`}
+                  >
+                    <Icon className="h-3.5 w-3.5 text-primary" />
+                    <span>{label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
 
 
@@ -291,7 +321,9 @@ export function SmartStreamView({
                         <Icon className="h-4 w-4 text-primary shrink-0" />
                         <div className="min-w-0 flex-1">
                           <div className="text-[12px] font-medium leading-tight">{label}</div>
-                          {isEditing ? (
+                          {!isPushType(slot.type) ? (
+                            <div className="text-[11px] text-muted-foreground italic">已启用</div>
+                          ) : isEditing ? (
                             <div className="mt-1 space-y-1" onClick={(e) => e.stopPropagation()}>
                               <input
                                 autoFocus
