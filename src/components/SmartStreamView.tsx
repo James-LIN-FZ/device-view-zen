@@ -38,8 +38,13 @@ type Pipeline = {
 
 const emptyPipeline = (): Pipeline => ({ slots: Array(SLOT_COUNT).fill(null) });
 
-export function SmartStreamView({ devices }: { devices: BackendDevice[] }) {
-  const [selectedSn, setSelectedSn] = useState<string>("");
+export function SmartStreamView({
+  devices,
+  selectedSn,
+}: {
+  devices: BackendDevice[];
+  selectedSn: string;
+}) {
   const [pipelines, setPipelines] = useState<Record<string, Pipeline>>({});
   const [draft, setDraft] = useState<Pipeline>(emptyPipeline());
   const [dragType, setDragType] = useState<PushType | null>(null);
@@ -48,17 +53,13 @@ export function SmartStreamView({ devices }: { devices: BackendDevice[] }) {
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
   const [editingUrl, setEditingUrl] = useState("");
 
-  // Auto-select first device
-  useEffect(() => {
-    if (!selectedSn && devices[0]) setSelectedSn(devices[0].serialNo);
-  }, [devices, selectedSn]);
-
   // Load draft when device changes
   useEffect(() => {
     setDraft(pipelines[selectedSn] ?? emptyPipeline());
     setSelectedNode(null);
     setEditingSlot(null);
-  }, [selectedSn, pipelines]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSn]);
 
   const device = useMemo(
     () => devices.find((d) => d.serialNo === selectedSn) ?? null,
