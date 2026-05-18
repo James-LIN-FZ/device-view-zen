@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Radio, LogOut, UserCircle2 } from "lucide-react";
+import { LogOut, UserCircle2 } from "lucide-react";
 import { getAuthUser, logout as logoutRequest } from "@/lib/auth";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export function TopBar() {
   const navigate = useNavigate();
