@@ -422,32 +422,37 @@ function FixedNode({
   icon,
   title,
   detail,
-  active,
+  copied,
   onClick,
 }: {
   icon: React.ReactNode;
   title: string;
   detail: string;
-  active?: boolean;
+  copied?: boolean;
   onClick?: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title="点击复制拉流地址"
       className={cn(
         "flex items-center gap-2 rounded-md border-2 bg-card/60 px-3 py-2 min-w-[260px] text-left transition-colors",
-        active
-          ? "border-primary bg-primary/10"
+        copied
+          ? "border-primary bg-primary/15"
           : "border-primary/50 hover:border-primary",
       )}
     >
       <div className="text-primary shrink-0">{icon}</div>
       <div className="min-w-0 flex-1">
         <div className="text-[12px] font-medium leading-tight">{title}</div>
-        <div className="text-[11px] text-muted-foreground truncate">{detail}</div>
+        <div className="text-[11px] text-muted-foreground truncate font-mono">{detail}</div>
       </div>
-      <ChevronRight className={cn("h-3.5 w-3.5 text-muted-foreground transition", active && "rotate-90 text-primary")} />
+      {copied ? (
+        <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+      ) : (
+        <Copy className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      )}
     </button>
   );
 }
