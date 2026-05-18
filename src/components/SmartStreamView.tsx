@@ -193,13 +193,13 @@ export function SmartStreamView({
       </div>
 
       {/* Pipeline area */}
-      <div className="flex-1 min-h-0 overflow-auto p-4">
+      <div className="flex-1 min-h-0 overflow-auto p-4 flex items-center justify-center">
         {!device ? (
-          <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+          <div className="text-xs text-muted-foreground">
             请从左侧选择一个设备查看智流 pipeline
           </div>
         ) : (
-          <div className="flex items-start gap-3 min-w-max">
+          <div className="flex items-center gap-3 min-w-max mx-auto">
             {/* Device node */}
             <PipelineNode
               icon={<HardDrive className="h-5 w-5" />}
