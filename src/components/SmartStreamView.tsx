@@ -426,24 +426,52 @@ function FixedNode({
 
 function Connector() {
   return (
-    <div className="self-stretch flex items-center">
-      <div className="h-px w-8 bg-border" />
+    <div className="flex items-center" aria-hidden>
+      <svg width="36" height="12" className="overflow-visible">
+        <line
+          x1="0"
+          y1="6"
+          x2="36"
+          y2="6"
+          stroke="var(--color-primary)"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+      </svg>
     </div>
   );
 }
 
 function BranchConnector({ count }: { count: number }) {
+  const rowH = 44;
+  const height = count * rowH;
+  const mid = height / 2;
   return (
-    <div className="self-stretch flex items-center" aria-hidden>
-      <svg width="36" height={count * 44} className="overflow-visible">
-        <path
-          d={`M0 ${(count * 44) / 2} H18 M18 22 V${count * 44 - 22} ${Array.from({ length: count })
-            .map((_, i) => `M18 ${22 + i * 44} H36`)
-            .join(" ")}`}
-          stroke="var(--color-border)"
-          strokeWidth="1"
-          fill="none"
+    <div className="flex items-center" aria-hidden>
+      <svg width="40" height={height} className="overflow-visible">
+        <line x1="0" y1={mid} x2="20" y2={mid} stroke="var(--color-primary)" strokeWidth="2.5" strokeLinecap="round" />
+        <line
+          x1="20"
+          y1={rowH / 2}
+          x2="20"
+          y2={height - rowH / 2}
+          stroke="var(--color-primary)"
+          strokeWidth="2.5"
+          strokeLinecap="round"
         />
+        {Array.from({ length: count }).map((_, i) => (
+          <line
+            key={i}
+            x1="20"
+            y1={rowH / 2 + i * rowH}
+            x2="40"
+            y2={rowH / 2 + i * rowH}
+            stroke="var(--color-primary)"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+        ))}
+        <circle cx="20" cy={mid} r="3" fill="var(--color-primary)" />
       </svg>
     </div>
   );
