@@ -132,6 +132,7 @@ export function SmartStreamView({
     }
     setEditingSlot(null);
     setEditingUrl("");
+    setEditingLatency("");
   };
 
   const removeSlot = (idx: number) => {
