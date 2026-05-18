@@ -43,10 +43,10 @@ function LoginPage() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md panel p-8 glow-primary">
         <div className="flex items-center gap-3 mb-8">
-          <BrandLogo size={48} />
+          <BrandLogo size={58} />
           <div>
-            <h1 className="text-lg font-semibold tracking-wide">UBS-Mux</h1>
-            <p className="text-xs text-muted-foreground">视频传输设备管理平台</p>
+            <h1 className="text-lg font-semibold tracking-wide text-primary">UBS-Mux</h1>
+            <p className="text-xs text-muted-foreground">智流聚合媒体云</p>
           </div>
         </div>
 
