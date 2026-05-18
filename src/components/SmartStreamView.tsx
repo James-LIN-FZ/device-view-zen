@@ -52,6 +52,18 @@ export function SmartStreamView({
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
   const [editingUrl, setEditingUrl] = useState("");
+  const [editingLatency, setEditingLatency] = useState("");
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const copyToClipboard = async (key: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 1200);
+    } catch {
+      // ignore
+    }
+  };
 
   // Load draft when device changes
   useEffect(() => {
