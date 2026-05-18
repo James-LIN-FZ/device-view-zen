@@ -1,11 +1,12 @@
-import { SlidersHorizontal, MonitorPlay, Users } from "lucide-react";
+import { SlidersHorizontal, MonitorPlay, Users, Workflow } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type ViewKey = "control" | "monitor" | "users";
+export type ViewKey = "control" | "monitor" | "smartstream" | "users";
 
 const items: { key: ViewKey; label: string; Icon: typeof SlidersHorizontal }[] = [
   { key: "control", label: "控制台", Icon: SlidersHorizontal },
   { key: "monitor", label: "监看", Icon: MonitorPlay },
+  { key: "smartstream", label: "智流", Icon: Workflow },
   { key: "users", label: "用户管理", Icon: Users },
 ];
 
