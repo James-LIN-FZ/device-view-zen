@@ -100,14 +100,23 @@ export function SmartStreamView({
     const type = dragType;
     setHoverSlot(null);
     setDragType(null);
-    setEditingSlot(idx);
-    setEditingUrl("");
-    setEditingLatency(type === "srt" ? "120" : "");
-    setDraft((prev) => {
-      const next = { slots: [...prev.slots] };
-      next.slots[idx] = { type, url: "", ...(type === "srt" ? { latencyMs: 120 } : {}) };
-      return next;
-    });
+    if (isPushType(type)) {
+      setEditingSlot(idx);
+      setEditingUrl("");
+      setEditingLatency(type === "srt" ? "120" : "");
+      setDraft((prev) => {
+        const next = { slots: [...prev.slots] };
+        next.slots[idx] = { type, url: "", ...(type === "srt" ? { latencyMs: 120 } : {}) };
+        return next;
+      });
+    } else {
+      // AI task — no URL editing needed
+      setDraft((prev) => {
+        const next = { slots: [...prev.slots] };
+        next.slots[idx] = { type, url: "" };
+        return next;
+      });
+    }
   };
 
   const commitEdit = () => {
