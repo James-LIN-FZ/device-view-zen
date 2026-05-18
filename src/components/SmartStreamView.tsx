@@ -3,13 +3,12 @@ import {
   Workflow,
   Server,
   HardDrive,
-  Radio,
   Video,
   Upload,
   X,
   RotateCcw,
   Check,
-  ChevronRight,
+  Copy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BackendDevice } from "@/lib/device-api";
@@ -19,6 +18,7 @@ export type PushType = "srt" | "rtsp" | "rtmp";
 interface PushSlot {
   type: PushType;
   url: string;
+  latencyMs?: number;
 }
 
 const SMUX_SERVER = { host: "smux.local", port: 8080 };
@@ -26,9 +26,9 @@ const SRT_PULL = `srt://${SMUX_SERVER.host}:9000?streamid=pull`;
 const RTSP_PULL = `rtsp://${SMUX_SERVER.host}:8554/live`;
 const SLOT_COUNT = 4;
 
-const PUSH_META: Record<PushType, { label: string; Icon: typeof Radio; placeholder: string }> = {
-  srt: { label: "SRT Push", Icon: Radio, placeholder: "srt://host:port?streamid=xxx" },
-  rtsp: { label: "RTSP Push", Icon: Video, placeholder: "rtsp://host:port/path" },
+const PUSH_META: Record<PushType, { label: string; Icon: typeof Upload; placeholder: string }> = {
+  srt: { label: "SRT Push", Icon: Upload, placeholder: "srt://host:port?streamid=xxx" },
+  rtsp: { label: "RTSP Push", Icon: Upload, placeholder: "rtsp://host:port/path" },
   rtmp: { label: "RTMP Push", Icon: Upload, placeholder: "rtmp://host/app/stream" },
 };
 
@@ -52,6 +52,18 @@ export function SmartStreamView({
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
   const [editingUrl, setEditingUrl] = useState("");
+  const [editingLatency, setEditingLatency] = useState("");
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const copyToClipboard = async (key: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 1200);
+    } catch {
+      // ignore
+    }
+  };
 
   // Load draft when device changes
   useEffect(() => {
@@ -78,9 +90,10 @@ export function SmartStreamView({
     setDragType(null);
     setEditingSlot(idx);
     setEditingUrl("");
+    setEditingLatency(type === "srt" ? "120" : "");
     setDraft((prev) => {
       const next = { slots: [...prev.slots] };
-      next.slots[idx] = { type, url: "" };
+      next.slots[idx] = { type, url: "", ...(type === "srt" ? { latencyMs: 120 } : {}) };
       return next;
     });
   };
@@ -90,11 +103,19 @@ export function SmartStreamView({
     setDraft((prev) => {
       const next = { slots: [...prev.slots] };
       const cur = next.slots[editingSlot];
-      if (cur) next.slots[editingSlot] = { ...cur, url: editingUrl.trim() };
+      if (cur) {
+        const updated: PushSlot = { ...cur, url: editingUrl.trim() };
+        if (cur.type === "srt") {
+          const n = parseInt(editingLatency, 10);
+          updated.latencyMs = Number.isFinite(n) && n >= 0 ? n : 120;
+        }
+        next.slots[editingSlot] = updated;
+      }
       return next;
     });
     setEditingSlot(null);
     setEditingUrl("");
+    setEditingLatency("");
   };
 
   const cancelEdit = () => {
@@ -111,6 +132,7 @@ export function SmartStreamView({
     }
     setEditingSlot(null);
     setEditingUrl("");
+    setEditingLatency("");
   };
 
   const removeSlot = (idx: number) => {
@@ -227,19 +249,25 @@ export function SmartStreamView({
             <div className="flex flex-col gap-2">
               {/* Fixed: SRT Server */}
               <FixedNode
-                icon={<Radio className="h-4 w-4" />}
+                icon={<Video className="h-4 w-4" />}
                 title="SRT Server"
-                detail={selectedNode === "srt-server" ? SRT_PULL : "点击查看拉流地址"}
-                active={selectedNode === "srt-server"}
-                onClick={() => setSelectedNode("srt-server")}
+                detail={SRT_PULL}
+                copied={copiedKey === "srt-server"}
+                onClick={() => {
+                  setSelectedNode("srt-server");
+                  copyToClipboard("srt-server", SRT_PULL);
+                }}
               />
               {/* Fixed: RTSP Server */}
               <FixedNode
                 icon={<Video className="h-4 w-4" />}
                 title="RTSP Server"
-                detail={selectedNode === "rtsp-server" ? RTSP_PULL : "点击查看拉流地址"}
-                active={selectedNode === "rtsp-server"}
-                onClick={() => setSelectedNode("rtsp-server")}
+                detail={RTSP_PULL}
+                copied={copiedKey === "rtsp-server"}
+                onClick={() => {
+                  setSelectedNode("rtsp-server");
+                  copyToClipboard("rtsp-server", RTSP_PULL);
+                }}
               />
 
               {/* Editable slots */}
@@ -264,25 +292,51 @@ export function SmartStreamView({
                         <div className="min-w-0 flex-1">
                           <div className="text-[12px] font-medium leading-tight">{label}</div>
                           {isEditing ? (
-                            <input
-                              autoFocus
-                              value={editingUrl}
-                              placeholder={PUSH_META[slot.type].placeholder}
-                              onChange={(e) => setEditingUrl(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              onBlur={commitEdit}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  commitEdit();
-                                }
-                                if (e.key === "Escape") {
-                                  e.preventDefault();
-                                  cancelEdit();
-                                }
-                              }}
-                              className="mt-1 w-full rounded-sm border border-primary/50 bg-background px-1.5 py-0.5 text-[11px] outline-none"
-                            />
+                            <div className="mt-1 space-y-1" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                autoFocus
+                                value={editingUrl}
+                                placeholder={PUSH_META[slot.type].placeholder}
+                                onChange={(e) => setEditingUrl(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && slot.type !== "srt") {
+                                    e.preventDefault();
+                                    commitEdit();
+                                  }
+                                  if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    cancelEdit();
+                                  }
+                                }}
+                                onBlur={slot.type === "srt" ? undefined : commitEdit}
+                                className="w-full rounded-sm border border-primary/50 bg-background px-1.5 py-0.5 text-[11px] outline-none"
+                              />
+                              {slot.type === "srt" && (
+                                <div className="flex items-center gap-1.5">
+                                  <label className="text-[10px] text-muted-foreground shrink-0">延迟</label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    value={editingLatency}
+                                    placeholder="120"
+                                    onChange={(e) => setEditingLatency(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        commitEdit();
+                                      }
+                                      if (e.key === "Escape") {
+                                        e.preventDefault();
+                                        cancelEdit();
+                                      }
+                                    }}
+                                    onBlur={commitEdit}
+                                    className="w-20 rounded-sm border border-primary/50 bg-background px-1.5 py-0.5 text-[11px] outline-none"
+                                  />
+                                  <span className="text-[10px] text-muted-foreground">ms</span>
+                                </div>
+                              )}
+                            </div>
                           ) : (
                             <button
                               type="button"
@@ -291,11 +345,21 @@ export function SmartStreamView({
                                 e.stopPropagation();
                                 setEditingSlot(i);
                                 setEditingUrl(slot.url);
+                                setEditingLatency(slot.latencyMs?.toString() ?? "120");
                                 setSelectedNode(`slot-${i}`);
                               }}
                               title="点击编辑推流地址"
                             >
-                              {slot.url || <span className="italic">未设置 · 点击编辑</span>}
+                              {slot.url ? (
+                                <span className="font-mono">
+                                  {slot.url}
+                                  {slot.type === "srt" && slot.latencyMs != null && (
+                                    <span className="ml-1 text-primary/80">· {slot.latencyMs}ms</span>
+                                  )}
+                                </span>
+                              ) : (
+                                <span className="italic">未设置 · 点击编辑</span>
+                              )}
                             </button>
                           )}
                         </div>
@@ -376,10 +440,10 @@ function PipelineNode({
     >
       <div
         className={cn(
-          "h-10 w-10 rounded-full flex items-center justify-center border",
+          "h-10 w-10 rounded-full flex items-center justify-center border-2",
           tone === "offline"
             ? "border-border bg-muted/30 text-muted-foreground"
-            : "border-primary/40 bg-primary/10 text-primary",
+            : "border-primary bg-primary text-primary-foreground",
         )}
       >
         {icon}
@@ -394,32 +458,37 @@ function FixedNode({
   icon,
   title,
   detail,
-  active,
+  copied,
   onClick,
 }: {
   icon: React.ReactNode;
   title: string;
   detail: string;
-  active?: boolean;
+  copied?: boolean;
   onClick?: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title="点击复制拉流地址"
       className={cn(
         "flex items-center gap-2 rounded-md border-2 bg-card/60 px-3 py-2 min-w-[260px] text-left transition-colors",
-        active
-          ? "border-primary bg-primary/10"
+        copied
+          ? "border-primary bg-primary/15"
           : "border-primary/50 hover:border-primary",
       )}
     >
       <div className="text-primary shrink-0">{icon}</div>
       <div className="min-w-0 flex-1">
         <div className="text-[12px] font-medium leading-tight">{title}</div>
-        <div className="text-[11px] text-muted-foreground truncate">{detail}</div>
+        <div className="text-[11px] text-muted-foreground truncate font-mono">{detail}</div>
       </div>
-      <ChevronRight className={cn("h-3.5 w-3.5 text-muted-foreground transition", active && "rotate-90 text-primary")} />
+      {copied ? (
+        <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+      ) : (
+        <Copy className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      )}
     </button>
   );
 }
