@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Activity, Video, Settings2, Save, Play, Square, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Activity, Video, Settings2, Save, Play, Square, RefreshCw, X } from "lucide-react";
 import type { BackendDeviceStatusData } from "@/lib/device-api";
 
 const ENCODE_TASKS = [
@@ -101,6 +101,47 @@ function parseVideoBitrate(status: BackendDeviceStatusData | null | undefined): 
   return Math.max(1, Math.round(value));
 }
 
+function isNoSignal(status: BackendDeviceStatusData | null | undefined): boolean {
+  if (!status) return true;
+  const codecRes = (status.sVideoCodec?.sResolution || "").trim().toLowerCase();
+  const paramsRes = (status.sVideoParams?.sResolution || "").trim().toLowerCase();
+  const resolutionText = `${codecRes} ${paramsRes}`;
+  if (resolutionText.includes("nosignal") || resolutionText.includes("no signal")) {
+    return true;
+  }
+  const width = status.sVideoCodec?.iWidth || status.sVideoParams?.iWidth || 0;
+  const height = status.sVideoCodec?.iHeight || status.sVideoParams?.iHeight || 0;
+  return width <= 0 || height <= 0;
+}
+
+function getPreviewBaseUrl(streamUrl: string): string | null {
+  if (!streamUrl || streamUrl === "--") return null;
+  try {
+    const parsed = new URL(streamUrl);
+    if (parsed.protocol.toLowerCase() !== "srt:") return null;
+    const srtPort = Number(parsed.port);
+    if (!Number.isFinite(srtPort) || srtPort < 15000 || srtPort > 15099) return null;
+    const previewPort = 19000 + (srtPort - 15000);
+    return `http://${parsed.hostname}:${previewPort}/api/frame.jpeg?src=main`;
+  } catch {
+    return null;
+  }
+}
+
+function getWebrtcBaseUrl(streamUrl: string): string | null {
+  if (!streamUrl || streamUrl === "--") return null;
+  try {
+    const parsed = new URL(streamUrl);
+    if (parsed.protocol.toLowerCase() !== "srt:") return null;
+    const srtPort = Number(parsed.port);
+    if (!Number.isFinite(srtPort) || srtPort < 15000 || srtPort > 15099) return null;
+    const webrtcPort = 19000 + (srtPort - 15000);
+    return `http://${parsed.hostname}:${webrtcPort}/stream.html?src=540p`;
+  } catch {
+    return null;
+  }
+}
+
 function buildForm(status: BackendDeviceStatusData | null | undefined): EncodingForm {
   if (!status) return EMPTY_FORM;
   return {
@@ -123,7 +164,7 @@ export function EncodingPanel({
   online: boolean;
   status: BackendDeviceStatusData | null;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const fallbackCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [form, setForm] = useState<EncodingForm>(() => buildForm(status));
   const [bitrateNum, setBitrateNum] = useState(() => parseVideoBitrate(status) || 8);
   const [latency, setLatency] = useState(500);
@@ -131,6 +172,10 @@ export function EncodingPanel({
   const [running, setRunning] = useState(false);
   const [localRecordingEnabled, setLocalRecordingEnabled] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [webrtcOpen, setWebrtcOpen] = useState(false);
+  const [previewNonce, setPreviewNonce] = useState(0);
+  const [previewLoadFailed, setPreviewLoadFailed] = useState(false);
+  const [webrtcNonce, setWebrtcNonce] = useState(0);
 
   const resetEditPanel = () => {
     setLatency(500);
@@ -147,65 +192,70 @@ export function EncodingPanel({
     setDirty(false);
   }, [status]);
 
-  // Faux live preview
+  const noSignal = online ? isNoSignal(status) : true;
+  const previewBaseUrl = useMemo(() => getPreviewBaseUrl(form.streamUrl), [form.streamUrl]);
+  const webrtcBaseUrl = useMemo(() => getWebrtcBaseUrl(form.streamUrl), [form.streamUrl]);
+  const canShowPreview = online && !noSignal && !!previewBaseUrl;
+  const canPlayWebrtc = canShowPreview && !previewLoadFailed && !!webrtcBaseUrl;
+  const previewSrc = useMemo(() => {
+    if (!canShowPreview || !previewBaseUrl) return "";
+    return `${previewBaseUrl}&_r=${previewNonce}`;
+  }, [canShowPreview, previewBaseUrl, previewNonce]);
+  const webrtcSrc = useMemo(() => {
+    if (!canPlayWebrtc || !webrtcBaseUrl) return "";
+    const sep = webrtcBaseUrl.includes("?") ? "&" : "?";
+    return `${webrtcBaseUrl}${sep}_r=${webrtcNonce}`;
+  }, [canPlayWebrtc, webrtcBaseUrl, webrtcNonce]);
+
   useEffect(() => {
-    const canvas = canvasRef.current;
+    setPreviewLoadFailed(false);
+    setPreviewNonce((v) => v + 1);
+    setWebrtcOpen(false);
+    setWebrtcNonce(0);
+  }, [previewBaseUrl, online, noSignal]);
+
+  // Draw a 360p RGB fallback frame for offline / no-signal states.
+  useEffect(() => {
+    if (canShowPreview && !previewLoadFailed) return;
+    const canvas = fallbackCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    let raf = 0;
-    let frame = 0;
-    const offline = !online;
+    const w = 640;
+    const h = 360;
+    canvas.width = w;
+    canvas.height = h;
 
-    const draw = () => {
-      const w = canvas.width;
-      const h = canvas.height;
-      if (offline) {
-        ctx.fillStyle = "#0a0d12";
-        ctx.fillRect(0, 0, w, h);
-        const img = ctx.createImageData(w, h);
-        for (let i = 0; i < img.data.length; i += 4) {
-          const v = Math.random() * 60;
-          img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-          img.data[i + 3] = 255;
-        }
-        ctx.putImageData(img, 0, 0);
-        ctx.fillStyle = "rgba(0,0,0,0.55)";
-        ctx.fillRect(0, 0, w, h);
-        ctx.fillStyle = "#888";
-        ctx.font = "600 18px ui-sans-serif, system-ui";
-        ctx.textAlign = "center";
-        ctx.fillText("NO SIGNAL", w / 2, h / 2);
-      } else {
-        const t = frame / 60;
-        const grd = ctx.createLinearGradient(0, 0, w, h);
-        grd.addColorStop(0, `hsl(${(t * 30) % 360}, 60%, 18%)`);
-        grd.addColorStop(0.5, `hsl(${(t * 30 + 60) % 360}, 70%, 28%)`);
-        grd.addColorStop(1, `hsl(${(t * 30 + 180) % 360}, 60%, 14%)`);
-        ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, w, h);
-        for (let i = 0; i < 6; i++) {
-          ctx.fillStyle = `rgba(255,255,255,${0.04 + (i % 2) * 0.03})`;
-          const x = ((t * 40 + i * 90) % (w + 120)) - 60;
-          ctx.fillRect(x, 0, 30, h);
-        }
-        ctx.fillStyle = "rgba(0,0,0,0.18)";
-        for (let y = 0; y < h; y += 3) ctx.fillRect(0, y, w, 1);
-        ctx.strokeStyle = "rgba(255,255,255,0.15)";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(w / 2, h / 2 - 14);
-        ctx.lineTo(w / 2, h / 2 + 14);
-        ctx.moveTo(w / 2 - 14, h / 2);
-        ctx.lineTo(w / 2 + 14, h / 2);
-        ctx.stroke();
-      }
-      frame++;
-      raf = requestAnimationFrame(draw);
-    };
-    draw();
-    return () => cancelAnimationFrame(raf);
-  }, [online, deviceName]);
+    const grad = ctx.createLinearGradient(0, 0, w, h);
+    grad.addColorStop(0, "#330000");
+    grad.addColorStop(0.33, "#003300");
+    grad.addColorStop(0.66, "#001033");
+    grad.addColorStop(1, "#220022");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    for (let x = 0; x < w; x += 24) {
+      const r = (x / w) * 255;
+      const g = ((w - x) / w) * 255;
+      const b = ((x % 120) / 120) * 255;
+      ctx.fillStyle = `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, 0.18)`;
+      ctx.fillRect(x, 0, 12, h);
+    }
+
+    ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
+    for (let y = 0; y < h; y += 3) {
+      ctx.fillRect(0, y, w, 1);
+    }
+
+    const label = online ? "No Signal" : "Device Offline";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = "#f3f6ff";
+    ctx.font = "600 30px ui-sans-serif, system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, w / 2, h / 2);
+  }, [canShowPreview, previewLoadFailed, online, deviceName]);
 
   const live = online;
   const realtimeBitrate = status?.sVideoCodec?.sActBitrate || "--";
@@ -236,15 +286,77 @@ export function EncodingPanel({
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-7 gap-2 p-2 min-h-0">
         {/* Preview */}
         <div className="lg:col-span-3 flex flex-col min-h-0">
-          <div className="relative flex-1 min-h-0 rounded-sm overflow-hidden border border-border bg-black">
-            <canvas ref={canvasRef} width={960} height={540} className="h-full w-full object-cover" />
-            <div className="absolute top-1.5 left-1.5 flex items-center gap-1.5 rounded-sm bg-black/60 px-1.5 py-0.5 text-[10px] font-mono">
-              <span className={`inline-block h-1.5 w-1.5 rounded-full ${live ? "bg-destructive" : "bg-muted-foreground"}`} />
-              {live ? "REC" : "IDLE"} · {form.resolution} · {form.framerate}
-            </div>
-            <div className="absolute bottom-1.5 right-1.5 rounded-sm bg-black/60 px-1.5 py-0.5 text-[10px] font-mono text-primary">
-              {form.videoCodec}
-            </div>
+          <div className="group relative flex-1 min-h-0 rounded-sm overflow-hidden border border-border bg-black">
+            {webrtcOpen ? (
+              <>
+                <iframe
+                  src={webrtcSrc}
+                  className="absolute inset-0 h-full w-full border-0"
+                  allow="autoplay; camera; microphone"
+                  title="WebRTC 预览"
+                />
+                <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                  <button
+                    type="button"
+                    onClick={() => setWebrtcNonce((v) => v + 1)}
+                    className="inline-flex items-center justify-center rounded-sm border border-border/60 bg-black/70 p-1 text-muted-foreground hover:text-foreground transition"
+                    title="刷新播放"
+                    aria-label="刷新播放"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWebrtcOpen(false)}
+                    className="inline-flex items-center justify-center rounded-sm border border-border/60 bg-black/70 p-1 text-muted-foreground hover:text-foreground transition"
+                    title="关闭预览"
+                    aria-label="关闭预览"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {canShowPreview && !previewLoadFailed ? (
+                  <img
+                    src={previewSrc}
+                    alt="设备预览图"
+                    className="h-full w-full object-cover"
+                    onError={() => setPreviewLoadFailed(true)}
+                  />
+                ) : (
+                  <canvas ref={fallbackCanvasRef} width={640} height={360} className="h-full w-full object-cover" />
+                )}
+                {canPlayWebrtc ? (
+                  <button
+                    type="button"
+                    onClick={() => setWebrtcOpen(true)}
+                    className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/0 opacity-0 transition group-hover:pointer-events-auto group-hover:bg-black/20 group-hover:opacity-100"
+                    
+                  >
+                    <span className="inline-flex items-center justify-center rounded-full border border-primary/70 bg-black/65 p-2.5 text-primary shadow-sm">
+                      <Play className="h-5 w-5" />
+                    </span>
+                  </button>
+                ) : null}
+                {canShowPreview ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPreviewLoadFailed(false);
+                      setPreviewNonce((v) => v + 1);
+                    }}
+                    className="absolute top-1.5 right-1.5 z-20 inline-flex items-center justify-center rounded-sm border border-border/60 bg-black/70 p-1 text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-foreground"
+                    title="刷新预览图"
+                    aria-label="刷新预览图"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                  </button>
+                ) : null}
+              </>
+            )}
           </div>
         </div>
 

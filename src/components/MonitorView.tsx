@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, MonitorPlay } from "lucide-react";
+import { X, MonitorPlay, RefreshCw, Play } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { fetchDeviceStatus, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
 import { getAuthToken } from "@/lib/auth";
@@ -88,6 +88,47 @@ function makeInitialSeries(): Sample[] {
 function makeInitialQuality(): QualitySample[] {
   const now = Date.now();
   return Array.from({ length: POINTS }, (_, i) => ({ t: now - (POINTS - i) * 1000, rtt: 0, loss: 0 }));
+}
+
+function isNoSignal(status: BackendDeviceStatusData | null | undefined): boolean {
+  if (!status) return true;
+  const codecRes = (status.sVideoCodec?.sResolution || "").trim().toLowerCase();
+  const paramsRes = (status.sVideoParams?.sResolution || "").trim().toLowerCase();
+  const resolutionText = `${codecRes} ${paramsRes}`;
+  if (resolutionText.includes("nosignal") || resolutionText.includes("no signal")) {
+    return true;
+  }
+  const width = status.sVideoCodec?.iWidth || status.sVideoParams?.iWidth || 0;
+  const height = status.sVideoCodec?.iHeight || status.sVideoParams?.iHeight || 0;
+  return width <= 0 || height <= 0;
+}
+
+function getPreviewBaseUrl(streamUrl: string): string | null {
+  if (!streamUrl || streamUrl === "--") return null;
+  try {
+    const parsed = new URL(streamUrl);
+    if (parsed.protocol.toLowerCase() !== "srt:") return null;
+    const srtPort = Number(parsed.port);
+    if (!Number.isFinite(srtPort) || srtPort < 15000 || srtPort > 15099) return null;
+    const previewPort = 19000 + (srtPort - 15000);
+    return `http://${parsed.hostname}:${previewPort}/api/frame.jpeg?src=main`;
+  } catch {
+    return null;
+  }
+}
+
+function getWebrtcBaseUrl(streamUrl: string): string | null {
+  if (!streamUrl || streamUrl === "--") return null;
+  try {
+    const parsed = new URL(streamUrl);
+    if (parsed.protocol.toLowerCase() !== "srt:") return null;
+    const srtPort = Number(parsed.port);
+    if (!Number.isFinite(srtPort) || srtPort < 15000 || srtPort > 15099) return null;
+    const webrtcPort = 19000 + (srtPort - 15000);
+    return `http://${parsed.hostname}:${webrtcPort}/stream.html?src=240p`;
+  } catch {
+    return null;
+  }
 }
 
 export function MonitorView({ devices }: { devices: BackendDevice[] }) {
@@ -183,9 +224,13 @@ function EmptyTile({ label, hint }: { label: string; hint?: string }) {
 }
 
 function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: () => void }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const fallbackCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [status, setStatus] = useState<BackendDeviceStatusData | null>(null);
   const [onlineState, setOnlineState] = useState(device.online);
+  const [webrtcOpen, setWebrtcOpen] = useState(false);
+  const [previewNonce, setPreviewNonce] = useState(0);
+  const [previewLoadFailed, setPreviewLoadFailed] = useState(false);
+  const [webrtcNonce, setWebrtcNonce] = useState(0);
   const [series, setSeries] = useState<Sample[]>(() => makeInitialSeries());
   const [qualitySeries, setQualitySeries] = useState<QualitySample[]>(() => makeInitialQuality());
   const latestRef = useRef<{ up: number; down: number }>({ up: 0, down: 0 });
@@ -261,51 +306,71 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
     return () => clearInterval(id);
   }, [onlineState]);
 
-  // Faux preview
+  const streamUrl = status?.sMuxer?.sURL || "--";
+  const noSignal = onlineState ? isNoSignal(status) : true;
+  const previewBaseUrl = useMemo(() => getPreviewBaseUrl(streamUrl), [streamUrl]);
+  const webrtcBaseUrl = useMemo(() => getWebrtcBaseUrl(streamUrl), [streamUrl]);
+  const canShowPreview = onlineState && !noSignal && !!previewBaseUrl;
+  const canPlayWebrtc = canShowPreview && !previewLoadFailed && !!webrtcBaseUrl;
+  const previewSrc = useMemo(() => {
+    if (!canShowPreview || !previewBaseUrl) return "";
+    return `${previewBaseUrl}&_r=${previewNonce}`;
+  }, [canShowPreview, previewBaseUrl, previewNonce]);
+  const webrtcSrc = useMemo(() => {
+    if (!canPlayWebrtc || !webrtcBaseUrl) return "";
+    const sep = webrtcBaseUrl.includes("?") ? "&" : "?";
+    return `${webrtcBaseUrl}${sep}_r=${webrtcNonce}`;
+  }, [canPlayWebrtc, webrtcBaseUrl, webrtcNonce]);
+
   useEffect(() => {
-    const canvas = canvasRef.current;
+    setPreviewLoadFailed(false);
+    setPreviewNonce((v) => v + 1);
+    setWebrtcOpen(false);
+    setWebrtcNonce(0);
+  }, [previewBaseUrl, onlineState, noSignal]);
+
+  // Draw a 360p RGB fallback frame for offline / no-signal states.
+  useEffect(() => {
+    if (canShowPreview && !previewLoadFailed) return;
+    const canvas = fallbackCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    let raf = 0;
-    let frame = 0;
-    const offline = !onlineState;
-    const draw = () => {
-      const w = canvas.width;
-      const h = canvas.height;
-      if (offline) {
-        ctx.fillStyle = "#0a0d12";
-        ctx.fillRect(0, 0, w, h);
-        const img = ctx.createImageData(w, h);
-        for (let i = 0; i < img.data.length; i += 4) {
-          const v = Math.random() * 60;
-          img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-          img.data[i + 3] = 255;
-        }
-        ctx.putImageData(img, 0, 0);
-        ctx.fillStyle = "rgba(0,0,0,0.55)";
-        ctx.fillRect(0, 0, w, h);
-        ctx.fillStyle = "#888";
-        ctx.font = "600 14px ui-sans-serif, system-ui";
-        ctx.textAlign = "center";
-        ctx.fillText("NO SIGNAL", w / 2, h / 2);
-      } else {
-        const t = frame / 60;
-        const grd = ctx.createLinearGradient(0, 0, w, h);
-        grd.addColorStop(0, `hsl(${(t * 30) % 360}, 60%, 18%)`);
-        grd.addColorStop(0.5, `hsl(${(t * 30 + 60) % 360}, 70%, 28%)`);
-        grd.addColorStop(1, `hsl(${(t * 30 + 180) % 360}, 60%, 14%)`);
-        ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, w, h);
-        ctx.fillStyle = "rgba(0,0,0,0.18)";
-        for (let y = 0; y < h; y += 3) ctx.fillRect(0, y, w, 1);
-      }
-      frame++;
-      raf = requestAnimationFrame(draw);
-    };
-    draw();
-    return () => cancelAnimationFrame(raf);
-  }, [onlineState]);
+    const w = 640;
+    const h = 360;
+    canvas.width = w;
+    canvas.height = h;
+
+    const grad = ctx.createLinearGradient(0, 0, w, h);
+    grad.addColorStop(0, "#330000");
+    grad.addColorStop(0.33, "#003300");
+    grad.addColorStop(0.66, "#001033");
+    grad.addColorStop(1, "#220022");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    for (let x = 0; x < w; x += 24) {
+      const r = (x / w) * 255;
+      const g = ((w - x) / w) * 255;
+      const b = ((x % 120) / 120) * 255;
+      ctx.fillStyle = `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, 0.18)`;
+      ctx.fillRect(x, 0, 12, h);
+    }
+
+    ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
+    for (let y = 0; y < h; y += 3) {
+      ctx.fillRect(0, y, w, 1);
+    }
+
+    const label = onlineState ? "No Signal" : "Device Offline";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = "#f3f6ff";
+    ctx.font = "600 30px ui-sans-serif, system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, w / 2, h / 2);
+  }, [canShowPreview, previewLoadFailed, onlineState]);
 
   const last = series[series.length - 1] ?? { up: 0, down: 0 };
   const lastQ = qualitySeries[qualitySeries.length - 1] ?? { rtt: 0, loss: 0 };
@@ -352,14 +417,78 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
       {/* Body: preview left, params + chart right */}
       <div className="flex-1 grid grid-cols-[40%_30%_30%] min-h-0">
         {/* Preview */}
-        <div className="relative bg-black border-r border-border min-h-0 overflow-hidden">
-          <canvas ref={canvasRef} width={480} height={270} className="h-full w-full object-cover" />
-          <div className="absolute top-1 left-1 rounded-sm bg-black/60 px-1 py-0.5 text-[9px] font-mono">
-            {resolution} · {fps > 0 ? `${fps}fps` : "--"}
-          </div>
-          <div className="absolute bottom-1 right-1 rounded-sm bg-black/60 px-1 py-0.5 text-[9px] font-mono text-primary">
-            {actBitrate}
-          </div>
+        <div className="group relative bg-black border-r border-border min-h-0 overflow-hidden">
+          {webrtcOpen ? (
+            <>
+              <iframe
+                src={webrtcSrc}
+                className="absolute inset-0 h-full w-full border-0"
+                allow="autoplay; camera; microphone"
+                title="WebRTC 监看"
+                scrolling="no"
+              />
+              <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                <button
+                  type="button"
+                  onClick={() => setWebrtcNonce((v) => v + 1)}
+                  className="inline-flex items-center justify-center rounded-sm border border-border/60 bg-black/70 p-1 text-muted-foreground hover:text-foreground transition"
+                  title="刷新播放"
+                  aria-label="刷新播放"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWebrtcOpen(false)}
+                  className="inline-flex items-center justify-center rounded-sm border border-border/60 bg-black/70 p-1 text-muted-foreground hover:text-foreground transition"
+                  title="关闭预览"
+                  aria-label="关闭预览"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {canShowPreview && !previewLoadFailed ? (
+                <img
+                  src={previewSrc}
+                  alt="设备预览图"
+                  className="h-full w-full object-cover"
+                  onError={() => setPreviewLoadFailed(true)}
+                />
+              ) : (
+                <canvas ref={fallbackCanvasRef} width={640} height={360} className="h-full w-full object-cover" />
+              )}
+              {canPlayWebrtc ? (
+                <button
+                  type="button"
+                  onClick={() => setWebrtcOpen(true)}
+                  className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/0 opacity-0 transition group-hover:pointer-events-auto group-hover:bg-black/20 group-hover:opacity-100"
+                  title={`播放 WebRTC：${webrtcBaseUrl}`}
+                >
+                  <span className="inline-flex items-center justify-center rounded-full border border-primary/70 bg-black/65 p-2 text-primary shadow-sm">
+                    <Play className="h-4 w-4" />
+                  </span>
+                </button>
+              ) : null}
+              {canShowPreview ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreviewLoadFailed(false);
+                    setPreviewNonce((v) => v + 1);
+                  }}
+                  className="absolute top-1.5 right-1.5 z-20 inline-flex items-center justify-center rounded-sm border border-border/60 bg-black/70 p-1 text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-foreground"
+                  title="刷新预览图"
+                  aria-label="刷新预览图"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                </button>
+              ) : null}
+            </>
+          )}
         </div>
 
         {/* Params */}
