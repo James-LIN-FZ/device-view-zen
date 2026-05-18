@@ -35,7 +35,7 @@ export function TopBar() {
         <BrandLogo size={28} />
         <div className="leading-tight">
           <div className="text-[13px] font-semibold tracking-wide text-primary">UBS-Mux</div>
-          <div className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground">视频传输设备管理平台</div>
+          <div className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground">智流聚合媒体云</div>
         </div>
       </div>
 
