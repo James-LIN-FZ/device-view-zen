@@ -3,13 +3,12 @@ import {
   Workflow,
   Server,
   HardDrive,
-  Radio,
   Video,
   Upload,
   X,
   RotateCcw,
   Check,
-  ChevronRight,
+  Copy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BackendDevice } from "@/lib/device-api";
