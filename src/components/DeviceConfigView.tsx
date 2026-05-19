@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BackendDevice } from "@/lib/device-api";
+import { EncodingTasksPanel } from "@/components/EncodingTasksPanel";
 
 type SectionKey =
   | "encoding"
@@ -88,13 +89,19 @@ export function DeviceConfigView({
 
           {/* Right panel */}
           <div className="flex-1 min-w-0 overflow-y-auto p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <activeMeta.Icon className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold">{activeMeta.label}</h3>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {activeMeta.label}项即将上线，敬请期待。
-            </div>
+            {active === "encoding" ? (
+              <EncodingTasksPanel />
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-4">
+                  <activeMeta.Icon className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-semibold">{activeMeta.label}</h3>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {activeMeta.label}项即将上线，敬请期待。
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
