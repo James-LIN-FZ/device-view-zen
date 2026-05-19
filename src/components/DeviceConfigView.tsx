@@ -16,6 +16,7 @@ import { TemplatesPanel } from "@/components/TemplatesPanel";
 import { OsdPanel } from "@/components/OsdPanel";
 import { NetworkSettingsPanel } from "@/components/NetworkSettingsPanel";
 import { VoiceCallPanel } from "@/components/VoiceCallPanel";
+import { SystemInfoPanel } from "@/components/SystemInfoPanel";
 
 type SectionKey =
   | "encoding"
@@ -103,6 +104,8 @@ export function DeviceConfigView({
               <NetworkSettingsPanel />
             ) : active === "voice" ? (
               <VoiceCallPanel />
+            ) : active === "system" ? (
+              <SystemInfoPanel />
             ) : (
               <>
                 <div className="flex items-center gap-2 mb-4">
