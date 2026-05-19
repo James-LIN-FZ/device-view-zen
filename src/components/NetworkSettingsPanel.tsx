@@ -560,9 +560,9 @@ function Grid({ children }: { children: React.ReactNode }) {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs text-muted-foreground">{label}：</span>
-      <div className="text-sm">{children}</div>
+    <div className="flex items-center gap-2 min-h-8">
+      <span className="text-xs text-muted-foreground whitespace-nowrap">{label}：</span>
+      <div className="text-sm flex items-center">{children}</div>
     </div>
   );
 }
