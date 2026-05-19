@@ -64,7 +64,7 @@ export function DeviceConfigView({
       ) : (
         <div className="flex-1 min-h-0 flex overflow-hidden">
           {/* Secondary nav */}
-          <nav className="w-44 shrink-0 border-r border-border overflow-y-auto py-2">
+          <nav className="w-56 shrink-0 border-r border-border overflow-y-auto py-3">
             {SECTIONS.map(({ key, label, Icon }) => {
               const isActive = active === key;
               return (
@@ -73,13 +73,13 @@ export function DeviceConfigView({
                   type="button"
                   onClick={() => setActive(key)}
                   className={cn(
-                    "w-full flex items-center gap-2 px-3 py-2 text-[12px] text-left border-l-2 transition-colors",
+                    "w-full flex items-center gap-3 px-4 py-3.5 text-sm text-left border-l-2 transition-colors",
                     isActive
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40",
                   )}
                 >
-                  <Icon className="h-3.5 w-3.5" />
+                  <Icon className="h-4 w-4" />
                   <span>{label}</span>
                 </button>
               );
