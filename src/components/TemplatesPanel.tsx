@@ -110,8 +110,8 @@ const AUDIO_CODECS = ["AAC", "MP2", "Opus"];
 const CHANNELS = ["1", "2"];
 const SAMPLE_RATES = ["32KHz", "44.1KHz", "48KHz"];
 const AUDIO_BITRATES = ["64Kbps", "128Kbps", "192Kbps", "256Kbps"];
-const MAIN_STREAMS = ["S-MUX", "RTMP", "SRT"];
-const FORWARDS = ["关闭", "开启"];
+const MAIN_STREAMS = ["关闭", "S-MUX", "RTSP", "RTMP", "SRT", "TS Over UDP", "RTP"];
+const FORWARDS = ["关闭", "S-MUX", "RTSP", "RTMP", "SRT", "TS Over UDP", "RTP"];
 
 const badgeClass = (color: "hd" | "srt" | "follow") =>
   color === "srt"
