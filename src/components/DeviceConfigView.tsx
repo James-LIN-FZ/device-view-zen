@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { BackendDevice } from "@/lib/device-api";
 import { EncodingTasksPanel } from "@/components/EncodingTasksPanel";
+import { TemplatesPanel } from "@/components/TemplatesPanel";
 
 type SectionKey =
   | "encoding"
