@@ -27,8 +27,10 @@ interface Template {
   videoCodec: string;
   rateControl: string;
   resolution: string;
-  bitrateMode: string;
-  videoBitrate: number; // kbps
+  customWidth: string;
+  customHeight: string;
+  bitrateMode: string; // one of BITRATE_OPTIONS labels
+  customBitrate: string; // kbps when bitrateMode = 自定义
   frameRate: string;
   osd: boolean;
   gop: number;
@@ -39,12 +41,74 @@ interface Template {
   audioBitrate: string;
   // stream
   mainStream: string;
-  aggregateAddress: string;
+  mainUrl: string;
   delayMs: number;
   pullKey: string;
-  forward: string;
+  subStream: string;
+  subUrl: string;
+  subDelayMs: number;
   localRecord: boolean;
 }
+
+const VIDEO_CODECS = ["H.265", "H.264"];
+const RATE_CTRL = ["CBR", "ABR", "SBR", "GDR"];
+const RESOLUTIONS = [
+  "跟随源",
+  "3840x2160",
+  "1920x1080",
+  "1280x720",
+  "自定义",
+  "960x540",
+  "640x360",
+  "720x576",
+  "720x480",
+];
+const BITRATE_OPTIONS = [
+  "2Mbps",
+  "3Mbps",
+  "4Mbps",
+  "自定义",
+  "6Mbps",
+  "8Mbps",
+  "10Mbps",
+  "12Mbps",
+  "14Mbps",
+  "16Mbps",
+  "20Mbps",
+];
+const FRAME_RATES = ["跟随源", "60", "50", "30", "25", "24"];
+const AUDIO_CODECS = ["AAC", "MP2"];
+const CHANNELS = ["1", "2"];
+const SAMPLE_RATES = ["44.1KHz", "48KHz"];
+const AUDIO_BITRATES = [
+  "16Kbps",
+  "32Kbps",
+  "48Kbps",
+  "64Kbps",
+  "96Kbps",
+  "128Kbps",
+  "192Kbps",
+  "256Kbps",
+];
+const STREAM_OPTIONS_MAIN = [
+  "关闭",
+  "S-MUX",
+  "RTSP",
+  "RTP",
+  "TS Over UDP",
+  "RTMP",
+  "SRT",
+];
+const STREAM_OPTIONS_SUB = ["关闭", "RTSP", "RTP", "TS Over UDP", "RTMP", "SRT"];
+
+const STREAM_PREFIX: Record<string, string> = {
+  RTSP: "rtsp://",
+  RTP: "rtp://",
+  "TS Over UDP": "udp://",
+  RTMP: "rtmp://",
+  SRT: "srt://",
+  "S-MUX": "srt://",
+};
 
 const DEFAULTS: Template[] = [
   {
@@ -57,8 +121,10 @@ const DEFAULTS: Template[] = [
     videoCodec: "H.264",
     rateControl: "CBR",
     resolution: "1920x1080",
+    customWidth: "",
+    customHeight: "",
     bitrateMode: "自定义",
-    videoBitrate: 3500,
+    customBitrate: "3500",
     frameRate: "50",
     osd: false,
     gop: 50,
@@ -67,10 +133,12 @@ const DEFAULTS: Template[] = [
     sampleRate: "48KHz",
     audioBitrate: "64Kbps",
     mainStream: "S-MUX",
-    aggregateAddress: "Auto (后台自动配置)",
+    mainUrl: "",
     delayMs: 300,
     pullKey: "",
-    forward: "关闭",
+    subStream: "关闭",
+    subUrl: "",
+    subDelayMs: 500,
     localRecord: false,
   },
   {
@@ -83,8 +151,10 @@ const DEFAULTS: Template[] = [
     videoCodec: "H.265",
     rateControl: "CBR",
     resolution: "1920x1080",
+    customWidth: "",
+    customHeight: "",
     bitrateMode: "自定义",
-    videoBitrate: 6000,
+    customBitrate: "6000",
     frameRate: "50",
     osd: false,
     gop: 50,
@@ -93,33 +163,26 @@ const DEFAULTS: Template[] = [
     sampleRate: "48KHz",
     audioBitrate: "64Kbps",
     mainStream: "S-MUX",
-    aggregateAddress: "Auto (后台自动配置)",
+    mainUrl: "",
     delayMs: 300,
     pullKey: "",
-    forward: "关闭",
+    subStream: "关闭",
+    subUrl: "",
+    subDelayMs: 500,
     localRecord: false,
   },
 ];
 
-const VIDEO_CODECS = ["H.264", "H.265"];
-const RATE_CTRL = ["CBR", "VBR"];
-const RESOLUTIONS = ["1920x1080", "1280x720", "3840x2160"];
-const BITRATE_MODES = ["自定义", "自动"];
-const FRAME_RATES = ["25", "30", "50", "60"];
-const AUDIO_CODECS = ["AAC", "MP2", "Opus"];
-const CHANNELS = ["1", "2"];
-const SAMPLE_RATES = ["32KHz", "44.1KHz", "48KHz"];
-const AUDIO_BITRATES = ["64Kbps", "128Kbps", "192Kbps", "256Kbps"];
-const MAIN_STREAMS = ["关闭", "S-MUX", "RTSP", "RTMP", "SRT", "TS Over UDP", "RTP"];
-const FORWARDS = ["关闭", "S-MUX", "RTSP", "RTMP", "SRT", "TS Over UDP", "RTP"];
-
 const badgeClass = (color: "hd" | "srt" | "follow") =>
-  color === "srt"
-    ? "bg-green-500 text-black"
-    : "bg-yellow-400 text-black";
+  color === "srt" ? "bg-green-500 text-black" : "bg-yellow-400 text-black";
 
-const subtitleFor = (t: Template) =>
-  `${t.videoCodec}-${(t.videoBitrate / 1000).toFixed(0)}Mbps/${t.audioCodec}-${t.audioBitrate}`;
+const subtitleFor = (t: Template) => {
+  const bitrate =
+    t.bitrateMode === "自定义"
+      ? `${Math.round(Number(t.customBitrate || 0) / 1000) || (Number(t.customBitrate) / 1000).toFixed(1)}Mbps`
+      : t.bitrateMode;
+  return `${t.videoCodec}-${bitrate}/${t.audioCodec}-${t.audioBitrate}`;
+};
 
 export function TemplatesPanel() {
   const [items, setItems] = useState<Template[]>(DEFAULTS);
@@ -158,6 +221,17 @@ export function TemplatesPanel() {
   };
 
   if (editing) {
+    const isSmux = editing.mainStream === "S-MUX";
+    const mainOff = editing.mainStream === "关闭";
+    const subOff = editing.subStream === "关闭";
+    const mainShowDelay = editing.mainStream === "SRT" || isSmux;
+    const subShowDelay = editing.subStream === "SRT";
+    const customRes = editing.resolution === "自定义";
+    const customBr = editing.bitrateMode === "自定义";
+
+    // CBR is always selectable; ABR/SBR only when main is S-MUX (per reference)
+    const rateDisabled = (v: string) => (v === "ABR" || v === "SBR") && !isSmux;
+
     return (
       <div className="-mt-2 -ml-2">
         <div className="flex items-center gap-2 mb-5">
@@ -174,104 +248,241 @@ export function TemplatesPanel() {
         </div>
 
         <div className="max-w-4xl grid grid-cols-[5rem_11rem_5rem_1fr] gap-x-3 gap-y-2.5 items-center">
+          {/* ===== 视频部分 ===== */}
           <GLabel>模板名</GLabel>
           <div className="col-span-3">
-            <Input
-              value={editing.name}
-              onChange={(e) => patch({ name: e.target.value })}
-              className="max-w-xs"
-            />
+            <Input value={editing.name} disabled className="max-w-xs" />
           </div>
 
           <GLabel>视频编码</GLabel>
-          <Sel value={editing.videoCodec} options={VIDEO_CODECS} onChange={(v) => patch({ videoCodec: v })} />
+          <Sel
+            value={editing.videoCodec}
+            options={VIDEO_CODECS}
+            onChange={(v) => patch({ videoCodec: v })}
+          />
           <GLabel>码率控制</GLabel>
-          <div className="w-44">
-            <Sel value={editing.rateControl} options={RATE_CTRL} onChange={(v) => patch({ rateControl: v })} />
-          </div>
+          <Sel
+            value={editing.rateControl}
+            options={RATE_CTRL}
+            disabledOption={rateDisabled}
+            onChange={(v) => patch({ rateControl: v })}
+          />
 
           <GLabel>画面大小</GLabel>
-          <Sel value={editing.resolution} options={RESOLUTIONS} onChange={(v) => patch({ resolution: v })} />
-          <div className="col-span-2" />
-
+          <Sel
+            value={editing.resolution}
+            options={RESOLUTIONS}
+            onChange={(v) => patch({ resolution: v })}
+          />
+          {customRes ? (
+            <div className="col-span-2 flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">宽：</span>
+              <Input
+                value={editing.customWidth}
+                onChange={(e) => patch({ customWidth: e.target.value })}
+                className="w-24"
+              />
+              <span className="text-sm text-muted-foreground">高：</span>
+              <Input
+                value={editing.customHeight}
+                onChange={(e) => patch({ customHeight: e.target.value })}
+                className="w-24"
+              />
+            </div>
+          ) : (
+            <div className="col-span-2" />
+          )}
 
           <GLabel>视频码率</GLabel>
-          <Sel value={editing.bitrateMode} options={BITRATE_MODES} onChange={(v) => patch({ bitrateMode: v })} />
-          <div className="col-span-2 flex items-center gap-2">
-            <Input
-              type="number"
-              value={editing.videoBitrate}
-              onChange={(e) => patch({ videoBitrate: Number(e.target.value) })}
-              className="w-32"
-            />
-            <span className="text-sm text-muted-foreground">kbps</span>
-          </div>
+          <Sel
+            value={editing.bitrateMode}
+            options={BITRATE_OPTIONS}
+            onChange={(v) => patch({ bitrateMode: v })}
+          />
+          {customBr ? (
+            <div className="col-span-2 flex items-center gap-2">
+              <Input
+                value={editing.customBitrate}
+                onChange={(e) => patch({ customBitrate: e.target.value })}
+                className="w-32"
+              />
+              <span className="text-sm text-muted-foreground">kbps</span>
+            </div>
+          ) : (
+            <div className="col-span-2" />
+          )}
 
           <GLabel>输出帧率</GLabel>
-          <Sel value={editing.frameRate} options={FRAME_RATES} onChange={(v) => patch({ frameRate: v })} />
+          <Sel
+            value={editing.frameRate}
+            options={FRAME_RATES}
+            onChange={(v) => patch({ frameRate: v })}
+          />
           <GLabel>OSD</GLabel>
           <div>
-            <Checkbox checked={editing.osd} onCheckedChange={(v) => patch({ osd: !!v })} />
+            <Checkbox
+              checked={editing.osd}
+              onCheckedChange={(v) => patch({ osd: !!v })}
+            />
           </div>
 
           <GLabel>GOP</GLabel>
           <div className="col-span-3">
             <Input
               type="number"
+              min={1}
+              max={200}
               value={editing.gop}
               onChange={(e) => patch({ gop: Number(e.target.value) })}
               className="w-32"
             />
           </div>
 
+          {/* ===== 音频部分 ===== */}
           <div className="col-span-4 border-t border-border my-2" />
 
           <GLabel>音频编码</GLabel>
-          <Sel value={editing.audioCodec} options={AUDIO_CODECS} onChange={(v) => patch({ audioCodec: v })} />
+          <Sel
+            value={editing.audioCodec}
+            options={AUDIO_CODECS}
+            onChange={(v) => patch({ audioCodec: v })}
+          />
           <GLabel>声道数</GLabel>
-          <div className="w-44">
-            <Sel value={editing.channels} options={CHANNELS} onChange={(v) => patch({ channels: v })} />
-          </div>
+          <Sel
+            value={editing.channels}
+            options={CHANNELS}
+            onChange={(v) => patch({ channels: v })}
+          />
 
           <GLabel>采样率</GLabel>
-          <Sel value={editing.sampleRate} options={SAMPLE_RATES} onChange={(v) => patch({ sampleRate: v })} />
+          <Sel
+            value={editing.sampleRate}
+            options={SAMPLE_RATES}
+            onChange={(v) => patch({ sampleRate: v })}
+          />
           <div className="col-span-2" />
 
           <GLabel>音频码率</GLabel>
-          <Sel value={editing.audioBitrate} options={AUDIO_BITRATES} onChange={(v) => patch({ audioBitrate: v })} />
+          <Sel
+            value={editing.audioBitrate}
+            options={AUDIO_BITRATES}
+            onChange={(v) => patch({ audioBitrate: v })}
+          />
           <div className="col-span-2" />
 
-
+          {/* ===== 流配置 ===== */}
           <div className="col-span-4 border-t border-border my-2" />
 
+          {/* 主流 + 推流/聚合地址 */}
           <GLabel>主流</GLabel>
-          <Sel value={editing.mainStream} options={MAIN_STREAMS} onChange={(v) => patch({ mainStream: v })} />
-          <GLabel>聚合地址</GLabel>
-          <Input
-            value={editing.aggregateAddress}
-            onChange={(e) => patch({ aggregateAddress: e.target.value })}
-            className="max-w-md"
+          <Sel
+            value={editing.mainStream}
+            options={STREAM_OPTIONS_MAIN}
+            onChange={(v) =>
+              patch({
+                mainStream: v,
+                // S-MUX 时副流强制变为转发可选项；切回非 S-MUX 不动副流
+                mainUrl: v === "S-MUX" ? "" : editing.mainUrl,
+              })
+            }
           />
+          {mainOff ? (
+            <div className="col-span-2" />
+          ) : isSmux ? (
+            <>
+              <GLabel>聚合地址</GLabel>
+              <Input
+                value="Auto (后台自动配置)"
+                readOnly
+                className="max-w-md bg-muted/40"
+              />
+            </>
+          ) : (
+            <>
+              <GLabel>推流地址</GLabel>
+              <div className="flex items-center gap-1">
+                <span className="text-sm text-muted-foreground whitespace-nowrap">
+                  {STREAM_PREFIX[editing.mainStream] ?? ""}
+                </span>
+                <Input
+                  value={editing.mainUrl}
+                  onChange={(e) => patch({ mainUrl: e.target.value })}
+                  className="max-w-md"
+                />
+              </div>
+            </>
+          )}
 
-          <GLabel>延迟(ms)</GLabel>
-          <Input
-            type="number"
-            value={editing.delayMs}
-            onChange={(e) => patch({ delayMs: Number(e.target.value) })}
-            className="w-32"
+          {/* 主流 延迟 + 拉流密钥(仅 S-MUX) */}
+          {mainShowDelay && (
+            <>
+              <GLabel>延迟(ms)</GLabel>
+              <Input
+                type="number"
+                min={50}
+                max={15000}
+                step={50}
+                value={editing.delayMs}
+                onChange={(e) => patch({ delayMs: Number(e.target.value) })}
+                className="w-32"
+              />
+              {isSmux ? (
+                <>
+                  <GLabel>拉流密钥</GLabel>
+                  <Input
+                    value={editing.pullKey}
+                    onChange={(e) => patch({ pullKey: e.target.value })}
+                    placeholder="默认空"
+                    className="max-w-xs"
+                  />
+                </>
+              ) : (
+                <div className="col-span-2" />
+              )}
+            </>
+          )}
+
+          {/* 副流 / 转发 */}
+          <GLabel>{isSmux ? "转发" : "副流"}</GLabel>
+          <Sel
+            value={editing.subStream}
+            options={STREAM_OPTIONS_SUB}
+            onChange={(v) => patch({ subStream: v })}
           />
-          <GLabel>拉流密钥</GLabel>
-          <Input
-            value={editing.pullKey}
-            onChange={(e) => patch({ pullKey: e.target.value })}
-            placeholder="默认空"
-            className="max-w-xs"
-          />
+          {subOff ? (
+            <div className="col-span-2" />
+          ) : (
+            <>
+              <GLabel>推流地址</GLabel>
+              <div className="flex items-center gap-1">
+                <span className="text-sm text-muted-foreground whitespace-nowrap">
+                  {STREAM_PREFIX[editing.subStream] ?? ""}
+                </span>
+                <Input
+                  value={editing.subUrl}
+                  onChange={(e) => patch({ subUrl: e.target.value })}
+                  className="max-w-md"
+                />
+              </div>
+            </>
+          )}
 
-          <GLabel>转发</GLabel>
-          <Sel value={editing.forward} options={FORWARDS} onChange={(v) => patch({ forward: v })} />
-          <div className="col-span-2" />
-
+          {subShowDelay && (
+            <>
+              <GLabel>延迟(ms)</GLabel>
+              <div className="col-span-3">
+                <Input
+                  type="number"
+                  min={50}
+                  max={15000}
+                  step={50}
+                  value={editing.subDelayMs}
+                  onChange={(e) => patch({ subDelayMs: Number(e.target.value) })}
+                  className="w-32"
+                />
+              </div>
+            </>
+          )}
 
           <GLabel>本地录制</GLabel>
           <div className="col-span-3">
@@ -285,7 +496,9 @@ export function TemplatesPanel() {
         <div className="max-w-4xl flex items-center justify-between pt-6">
           <div className="flex gap-3">
             <Button onClick={() => setEditingId(null)}>确定</Button>
-            <Button variant="secondary" onClick={() => setEditingId(null)}>取消</Button>
+            <Button variant="secondary" onClick={() => setEditingId(null)}>
+              取消
+            </Button>
           </div>
           <Button variant="destructive" onClick={handleDelete} className="gap-1">
             <Trash2 className="h-4 w-4" />
@@ -295,7 +508,6 @@ export function TemplatesPanel() {
       </div>
     );
   }
-
 
   return (
     <div className="-mt-2 -ml-2">
@@ -358,8 +570,12 @@ export function TemplatesPanel() {
             />
           </div>
           <DialogFooter>
-            <Button variant="secondary" onClick={() => setCreateOpen(false)}>取消</Button>
-            <Button onClick={handleCreate} disabled={!newName.trim()}>确定</Button>
+            <Button variant="secondary" onClick={() => setCreateOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleCreate} disabled={!newName.trim()}>
+              确定
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -375,15 +591,16 @@ function GLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-
 function Sel({
   value,
   options,
   onChange,
+  disabledOption,
 }: {
   value: string;
   options: string[];
   onChange: (v: string) => void;
+  disabledOption?: (v: string) => boolean;
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
@@ -392,7 +609,7 @@ function Sel({
       </SelectTrigger>
       <SelectContent>
         {options.map((o) => (
-          <SelectItem key={o} value={o}>
+          <SelectItem key={o} value={o} disabled={disabledOption?.(o)}>
             {o}
           </SelectItem>
         ))}
