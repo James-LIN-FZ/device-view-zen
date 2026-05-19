@@ -75,26 +75,6 @@ export function SystemInfoPanel() {
     }, 800);
   };
 
-  const handleUpload = () => fileRef.current?.click();
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setImgDataUrl(f.name);
-    // 模拟升级进度
-    setShowProgress(true);
-    setCurProgress(0);
-    const t = setInterval(() => {
-      setCurProgress((p) => {
-        if (p >= 100) {
-          clearInterval(t);
-          setShowProgress(false);
-          toast.success("升级完成");
-          return 100;
-        }
-        return p + 10;
-      });
-    }, 400);
-  };
 
   const reboot = () => {
     if (confirm("确定重启设备?")) toast.success("设备重启指令已发送");
