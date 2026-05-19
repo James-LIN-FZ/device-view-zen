@@ -1,8 +1,7 @@
-import { useRef, useState } from "react";
-import { Eye, EyeOff, CheckCircle2, XCircle, Upload } from "lucide-react";
+import { useState } from "react";
+import { Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -11,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+
 
 export function SystemInfoPanel() {
   // 系统信息
@@ -29,12 +29,7 @@ export function SystemInfoPanel() {
 
   // 系统操作
   const [controlCmd, setControlCmd] = useState("");
-  const [imgDataUrl, setImgDataUrl] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
 
-  // 升级进度
-  const [showProgress, setShowProgress] = useState(false);
-  const [curProgress, setCurProgress] = useState(0);
 
   // 服务器配置
   const [passwordDialog, setPasswordDialog] = useState(false);
@@ -80,26 +75,6 @@ export function SystemInfoPanel() {
     }, 800);
   };
 
-  const handleUpload = () => fileRef.current?.click();
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setImgDataUrl(f.name);
-    // 模拟升级进度
-    setShowProgress(true);
-    setCurProgress(0);
-    const t = setInterval(() => {
-      setCurProgress((p) => {
-        if (p >= 100) {
-          clearInterval(t);
-          setShowProgress(false);
-          toast.success("升级完成");
-          return 100;
-        }
-        return p + 10;
-      });
-    }, 400);
-  };
 
   const reboot = () => {
     if (confirm("确定重启设备?")) toast.success("设备重启指令已发送");
@@ -220,22 +195,6 @@ export function SystemInfoPanel() {
               确认
             </Button>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground w-20 shrink-0">固件升级：</span>
-            <Input value={imgDataUrl} readOnly className="h-8 w-80" placeholder="未选择文件" />
-            <Button size="sm" onClick={handleUpload}>
-              <Upload className="h-3.5 w-3.5 mr-1" />
-              点击上传
-            </Button>
-            <input
-              ref={fileRef}
-              type="file"
-              className="hidden"
-              onChange={onFileChange}
-              accept=".pkg,.bin,.img"
-            />
-          </div>
-          <p className="text-xs text-amber-500">注意：在升级过程中请勿断开连接或断电</p>
           <div className="flex gap-3 pt-1">
             <Button variant="outline" size="sm" onClick={reboot}>
               重启
@@ -247,16 +206,6 @@ export function SystemInfoPanel() {
         </div>
       </section>
 
-      {/* ====== 升级进度 ====== */}
-      <Dialog open={showProgress}>
-        <DialogContent className="sm:max-w-xs">
-          <DialogHeader>
-            <DialogTitle>升级中</DialogTitle>
-          </DialogHeader>
-          <Progress value={curProgress} />
-          <p className="text-center text-sm text-muted-foreground">{curProgress}%</p>
-        </DialogContent>
-      </Dialog>
 
       {/* ====== 管理员密码 ====== */}
       <Dialog open={passwordDialog} onOpenChange={setPasswordDialog}>
