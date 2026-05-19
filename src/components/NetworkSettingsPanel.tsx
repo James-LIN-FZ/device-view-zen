@@ -280,21 +280,21 @@ export function NetworkSettingsPanel() {
                           <Input
                             value={e.ip}
                             onChange={(ev) => patchEth(e.name, { ip: ev.target.value })}
-                            className="h-8 w-44"
+                            className="h-8 w-32"
                           />
                         </Field>
                         <Field label="网关">
                           <Input
                             value={e.gateway}
                             onChange={(ev) => patchEth(e.name, { gateway: ev.target.value })}
-                            className="h-8 w-44"
+                            className="h-8 w-32"
                           />
                         </Field>
                         <Field label="子网掩码">
                           <Input
                             value={e.netmask}
                             onChange={(ev) => patchEth(e.name, { netmask: ev.target.value })}
-                            className="h-8 w-44"
+                            className="h-8 w-32"
                           />
                         </Field>
                       </>
@@ -306,14 +306,14 @@ export function NetworkSettingsPanel() {
                       <Input
                         value={e.dns1}
                         onChange={(ev) => patchEth(e.name, { dns1: ev.target.value })}
-                        className="h-8 w-44"
+                        className="h-8 w-32"
                       />
                     </Field>
                     <Field label="DNS2">
                       <Input
                         value={e.dns2}
                         onChange={(ev) => patchEth(e.name, { dns2: ev.target.value })}
-                        className="h-8 w-44"
+                        className="h-8 w-32"
                       />
                     </Field>
                     <Field label="路由优先级">
