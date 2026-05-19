@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { BackendDevice } from "@/lib/device-api";
 import { EncodingTasksPanel } from "@/components/EncodingTasksPanel";
+import { TemplatesPanel } from "@/components/TemplatesPanel";
 
 type SectionKey =
   | "encoding"
@@ -91,6 +92,8 @@ export function DeviceConfigView({
           <div className="flex-1 min-w-0 overflow-y-auto px-4 py-3">
             {active === "encoding" ? (
               <EncodingTasksPanel />
+            ) : active === "template" ? (
+              <TemplatesPanel />
             ) : (
               <>
                 <div className="flex items-center gap-2 mb-4">
