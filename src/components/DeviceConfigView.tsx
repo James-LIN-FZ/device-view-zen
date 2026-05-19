@@ -1,6 +1,35 @@
-import { useMemo } from "react";
-import { Settings } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  Settings,
+  SlidersHorizontal,
+  LayoutTemplate,
+  Captions,
+  Globe,
+  Phone,
+  FolderUp,
+  Info,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { BackendDevice } from "@/lib/device-api";
+
+type SectionKey =
+  | "encoding"
+  | "template"
+  | "osd"
+  | "network"
+  | "voice"
+  | "file"
+  | "system";
+
+const SECTIONS: { key: SectionKey; label: string; Icon: typeof Settings }[] = [
+  { key: "encoding", label: "编码配置", Icon: SlidersHorizontal },
+  { key: "template", label: "模板配置", Icon: LayoutTemplate },
+  { key: "osd", label: "OSD", Icon: Captions },
+  { key: "network", label: "网络设置", Icon: Globe },
+  { key: "voice", label: "语音通话", Icon: Phone },
+  { key: "file", label: "文件传输", Icon: FolderUp },
+  { key: "system", label: "系统信息", Icon: Info },
+];
 
 export function DeviceConfigView({
   devices,
@@ -13,6 +42,8 @@ export function DeviceConfigView({
     () => devices.find((d) => d.serialNo === selectedSn) ?? null,
     [devices, selectedSn],
   );
+  const [active, setActive] = useState<SectionKey>("encoding");
+  const activeMeta = SECTIONS.find((s) => s.key === active)!;
 
   return (
     <section className="panel flex flex-col h-full overflow-hidden">
@@ -26,17 +57,47 @@ export function DeviceConfigView({
         ) : null}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">
-        {!device ? (
-          <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-            请选择左侧设备
+      {!device ? (
+        <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+          请选择左侧设备
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 flex overflow-hidden">
+          {/* Secondary nav */}
+          <nav className="w-44 shrink-0 border-r border-border overflow-y-auto py-2">
+            {SECTIONS.map(({ key, label, Icon }) => {
+              const isActive = active === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setActive(key)}
+                  className={cn(
+                    "w-full flex items-center gap-2 px-3 py-2 text-[12px] text-left border-l-2 transition-colors",
+                    isActive
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40",
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Right panel */}
+          <div className="flex-1 min-w-0 overflow-y-auto p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <activeMeta.Icon className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold">{activeMeta.label}</h3>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {activeMeta.label}项即将上线，敬请期待。
+            </div>
           </div>
-        ) : (
-          <div className="text-sm text-muted-foreground">
-            配置项即将上线，敬请期待。
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </section>
   );
 }
