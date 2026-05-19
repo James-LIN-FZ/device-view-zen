@@ -457,15 +457,6 @@ export function NetworkSettingsPanel() {
                           onCheckedChange={(v) => patchModem(m.id, { autoConnect: !!v })}
                         />
                       </Field>
-                      <Field label="指令">
-                        <Input
-                          value={m.ext}
-                          maxLength={32}
-                          placeholder="文本输入框"
-                          onChange={(e) => patchModem(m.id, { ext: e.target.value })}
-                          className="h-8 w-60"
-                        />
-                      </Field>
                       <Field label="路由优先级">
                         <Input
                           type="number"
@@ -476,6 +467,15 @@ export function NetworkSettingsPanel() {
                             patchModem(m.id, { routePriority: Number(e.target.value) })
                           }
                           className="h-8 w-20"
+                        />
+                      </Field>
+                      <Field label="指令">
+                        <Input
+                          value={m.ext}
+                          maxLength={32}
+                          placeholder="文本输入框"
+                          onChange={(e) => patchModem(m.id, { ext: e.target.value })}
+                          className="h-8 w-40"
                         />
                       </Field>
                     </Grid>
