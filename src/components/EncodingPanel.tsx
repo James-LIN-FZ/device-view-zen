@@ -92,18 +92,17 @@ function toNumber(value: unknown): number | null {
   return null;
 }
 
-function parseTaskBitrateMbps(value: unknown): number {
+function parseTaskBitrateKbps(value: unknown): number {
   const raw = toNumber(value);
   if (!raw || raw <= 0) {
-    return 8;
+    return 8000;
   }
-  if (raw >= 1_000_000) {
-    return clamp(Math.round(raw / 1_000_000), 1, 50);
+  if (raw > 50_000) {
+    // Stored in bps (e.g. 200000 = 200 Kbps)
+    return clamp(Math.round(raw / 1_000), 200, 50000);
   }
-  if (raw >= 1_000) {
-    return clamp(Math.round(raw / 1_000), 1, 50);
-  }
-  return clamp(Math.round(raw), 1, 50);
+  // Already in Kbps
+  return clamp(Math.round(raw), 200, 50000);
 }
 
 function parseLatencyMs(value: unknown): number {
@@ -129,8 +128,8 @@ function parseLatencyMs(value: unknown): number {
   }
 }
 
-function getTaskBitrateMbps(task: EncodeTask | null | undefined): number {
-  return parseTaskBitrateMbps(task?.template?.iMainVBitrate);
+function getTaskBitrateKbps(task: EncodeTask | null | undefined): number {
+  return parseTaskBitrateKbps(task?.template?.iMainVBitrate);
 }
 
 function getTaskLatencyMs(task: EncodeTask | null | undefined): number {
@@ -163,14 +162,14 @@ function updateTaskLatency(task: EncodeTask | null, latencyMs: number): EncodeTa
   };
 }
 
-function updateTaskBitrate(task: EncodeTask | null, bitrateMbps: number): EncodeTask | null {
+function updateTaskBitrate(task: EncodeTask | null, bitrateKbps: number): EncodeTask | null {
   if (!task) {
     return null;
   }
-  const nextBitrate = clamp(Math.round(bitrateMbps), 1, 50);
+  const nextBitrate = clamp(Math.round(bitrateKbps), 200, 50000);
   const nextTemplate: EncodeTaskTemplateData = {
     ...(task.template || {}),
-    iMainVBitrate: nextBitrate * 1_000_000,
+    iMainVBitrate: nextBitrate * 1000,
   };
   return {
     ...task,
@@ -460,7 +459,8 @@ export function EncodingPanel({
     const enabledTask = parsedTasks.find((item) => item.enabled);
     const activeTask = enabledTask || parsedTasks[0];
     setTask(activeTask.key);
-    setCurrentTask(cloneTask(activeTask));
+    const taskClone = cloneTask(activeTask);
+    setCurrentTask(taskClone);
     setRunning(activeTask.enabled);
     setHasRunningTask(!!enabledTask);
     setDirty(false);
@@ -495,7 +495,8 @@ export function EncodingPanel({
 
   const resetEditPanel = () => {
     const selectedTask = encodeTasks.find((item) => item.key === task) || encodeTasks[0] || null;
-    setCurrentTask(cloneTask(selectedTask));
+    const taskClone = cloneTask(selectedTask);
+    setCurrentTask(taskClone);
     setTask(selectedTask?.key || "");
     setRunning(selectedTask?.enabled ?? false);
     setLocalRecordingEnabled(false);
@@ -592,7 +593,7 @@ export function EncodingPanel({
     const started = Date.now();
     while (Date.now() - started < timeoutMs) {
       const reply = await fetchDeviceRPCReply(serialNo, requestId);
-      if (reply && reply.status !== "pending" && isEncodePath(reply.path || "")) {
+      if (reply && reply.status !== "pending") {
         return reply.status === "ok";
       }
       await delay(500);
@@ -630,10 +631,49 @@ export function EncodingPanel({
     }
   };
 
+  const saveBitrate = async () => {
+    if (!serialNo || !online || !currentTask) {
+      return;
+    }
+    if (currentTask.iTemplate == null) {
+      return;
+    }
+
+    const templateID = String(currentTask.iTemplate).trim();
+    if (!templateID) {
+      return;
+    }
+
+    const bitrateToSave = getTaskBitrateKbps(currentTask) * 1000;
+    try {
+      setTaskLoading(true);
+      const ack = await requestDeviceRPC(serialNo, {
+        method: "POST",
+        path: `/template/${templateID}`,
+        body: { iMainVBitrate: bitrateToSave },
+      });
+      const requestId = (ack.requestId || "").trim();
+      if (requestId) {
+        const ok = await waitRPCDone(requestId, (ack.timeoutSeconds || 15) * 1000);
+        if (!ok) {
+          setTaskLoading(false);
+          return;
+        }
+      }
+      setDirty(false);
+      refreshEncodeTasks();
+    } catch {
+      setTaskLoading(false);
+    }
+  };
+
   useEffect(() => {
     setForm(buildForm(status));
-    setDirty(false);
-  }, [status]);
+    // 只在没有编辑或设备离线时重置 dirty
+    if (!dirty || !online) {
+      setDirty(false);
+    }
+  }, [status, dirty, online]);
 
   useEffect(() => {
     if (encodeTasks.length === 0) {
@@ -651,14 +691,15 @@ export function EncodingPanel({
     if (!selectedTask) {
       const first = encodeTasks[0];
       setTask(first.key);
-      setCurrentTask(cloneTask(first));
+      const taskClone = cloneTask(first);
+      setCurrentTask(taskClone);
       setRunning(first.enabled);
       setHasRunningTask(first.enabled);
       return;
     }
     setRunning(selectedTask.enabled);
     setHasRunningTask(selectedTask.enabled);
-  }, [currentTask, encodeTasks, task]);
+  }, [encodeTasks, task]);
 
   useEffect(() => {
     const cleanup = refreshEncodeTasks();
@@ -667,7 +708,7 @@ export function EncodingPanel({
 
   const taskSelectDisabled = !online || hasRunningTask;
   const currentTaskLatency = getTaskLatencyMs(currentTask);
-  const currentTaskBitrate = getTaskBitrateMbps(currentTask);
+  const currentTaskBitrate = getTaskBitrateKbps(currentTask);
   useEffect(() => {
     if (!rpcNotice || !serialNo) {
       return;
@@ -928,12 +969,13 @@ export function EncodingPanel({
                 />
               </div>
             </Field>
-            <Field label="码率 (Mbps)">
+            <Field label="码率 (Kbps)">
               <div className="flex items-center gap-2">
                 <input
                   type="range"
-                  min={1}
-                  max={50}
+                  min={200}
+                  max={50000}
+                  step={100}
                   value={currentTaskBitrate}
                   onChange={(e) => {
                     const next = updateTaskBitrate(currentTask, +e.target.value);
@@ -945,8 +987,9 @@ export function EncodingPanel({
                 />
                 <input
                   type="number"
-                  min={1}
-                  max={50}
+                  min={200}
+                  max={50000}
+                  step={100}
                   value={currentTaskBitrate}
                   onChange={(e) => {
                     const next = updateTaskBitrate(currentTask, +e.target.value);
@@ -974,8 +1017,10 @@ export function EncodingPanel({
               </button>
             </Field>
             <button
-              onClick={() => setDirty(false)}
-              disabled={!dirty}
+              onClick={() => {
+                void saveBitrate();
+              }}
+              disabled={!dirty || !online || !currentTask || taskLoading}
               className="w-full inline-flex items-center justify-center gap-1 rounded-sm bg-primary text-primary-foreground px-2 py-1.5 text-[11px] font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               <Save className="h-3 w-3" /> 应用
@@ -987,7 +1032,8 @@ export function EncodingPanel({
                   setTask(v);
                   const selectedTask = encodeTasks.find((item) => item.key === v);
                   if (selectedTask) {
-                    setCurrentTask(cloneTask(selectedTask));
+                    const taskClone = cloneTask(selectedTask);
+                    setCurrentTask(taskClone);
                     setRunning(selectedTask.enabled);
                   }
                   setDirty(true);
@@ -1032,7 +1078,7 @@ function Row({ k, v, mono, highlight }: { k: string; v: string; mono?: boolean; 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{label}</div>
+      <div className="text-[10px] tracking-wide text-muted-foreground mb-1">{label}</div>
       {children}
     </label>
   );
