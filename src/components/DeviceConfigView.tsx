@@ -14,6 +14,7 @@ import type { BackendDevice } from "@/lib/device-api";
 import { EncodingTasksPanel } from "@/components/EncodingTasksPanel";
 import { TemplatesPanel } from "@/components/TemplatesPanel";
 import { OsdPanel } from "@/components/OsdPanel";
+import { NetworkSettingsPanel } from "@/components/NetworkSettingsPanel";
 
 type SectionKey =
   | "encoding"
