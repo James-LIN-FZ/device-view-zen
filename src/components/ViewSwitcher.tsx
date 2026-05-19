@@ -6,8 +6,8 @@ export type ViewKey = "control" | "monitor" | "smartstream" | "config" | "users"
 const items: { key: ViewKey; label: string; Icon: typeof SlidersHorizontal }[] = [
   { key: "control", label: "控制台", Icon: SlidersHorizontal },
   { key: "monitor", label: "监看", Icon: MonitorPlay },
-  { key: "smartstream", label: "智流", Icon: Workflow },
   { key: "config", label: "配置", Icon: Settings },
+  { key: "smartstream", label: "智流", Icon: Workflow },
   { key: "users", label: "用户管理", Icon: Users },
 ];
 
