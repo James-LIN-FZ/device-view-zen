@@ -98,6 +98,8 @@ export function DeviceConfigView({
               <TemplatesPanel />
             ) : active === "osd" ? (
               <OsdPanel />
+            ) : active === "network" ? (
+              <NetworkSettingsPanel />
             ) : (
               <>
                 <div className="flex items-center gap-2 mb-4">
