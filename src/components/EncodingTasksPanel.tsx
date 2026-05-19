@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Play, ArrowLeft, Trash2 } from "lucide-react";
+import { Plus, Play, Square, ArrowLeft, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -127,18 +127,18 @@ export function EncodingTasksPanel() {
 
   if (editing) {
     return (
-      <div>
-        <div className="flex items-center gap-2 mb-6">
+      <div className="-mt-2 -ml-2">
+        <div className="flex items-center gap-2 mb-5">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setEditingId(null)}
-            className="gap-1"
+            className="gap-1 h-7 px-2 text-sm"
           >
             <ArrowLeft className="h-4 w-4" />
             返回
           </Button>
-          <h3 className="text-base font-semibold">修改任务</h3>
+          <h3 className="text-sm font-medium">修改任务</h3>
         </div>
 
         <div className="max-w-3xl space-y-5">
@@ -149,42 +149,48 @@ export function EncodingTasksPanel() {
               className="max-w-md"
             />
           </Row>
-          <div className="grid grid-cols-2 gap-x-8 gap-y-5">
-            <Row label="视频源">
-              <SelectBox
-                value={editing.videoSource}
-                options={VIDEO_SOURCES}
-                onChange={(v) => updateEditing({ videoSource: v })}
-              />
-            </Row>
-            <Row label="音频源">
-              <SelectBox
-                value={editing.audioSource}
-                options={AUDIO_SOURCES}
-                onChange={(v) => updateEditing({ audioSource: v })}
-              />
-            </Row>
-            <Row label="源去交错">
-              <SelectBox
-                value={editing.deinterlace}
-                options={DEINTERLACE_OPTIONS}
-                onChange={(v) => updateEditing({ deinterlace: v })}
-              />
-            </Row>
-            <Row label="主模版">
+          <Row label="视频源">
+            <SelectBox
+              value={editing.videoSource}
+              options={VIDEO_SOURCES}
+              onChange={(v) => updateEditing({ videoSource: v })}
+            />
+          </Row>
+          <Row label="音频源">
+            <SelectBox
+              value={editing.audioSource}
+              options={AUDIO_SOURCES}
+              onChange={(v) => updateEditing({ audioSource: v })}
+            />
+          </Row>
+          <Row label="源去交错">
+            <SelectBox
+              value={editing.deinterlace}
+              options={DEINTERLACE_OPTIONS}
+              onChange={(v) => updateEditing({ deinterlace: v })}
+            />
+          </Row>
+          <div className="flex items-center gap-4">
+            <label className="text-sm text-muted-foreground w-20 shrink-0 text-right">
+              主模版：
+            </label>
+            <div className="flex-1 min-w-0">
               <SelectBox
                 value={editing.mainTemplate}
                 options={TEMPLATES}
                 onChange={(v) => updateEditing({ mainTemplate: v })}
               />
-            </Row>
-            <Row label="副模版">
+            </div>
+            <label className="text-sm text-muted-foreground shrink-0 text-right">
+              副模版：
+            </label>
+            <div className="flex-1 min-w-0">
               <SelectBox
                 value={editing.subTemplate}
                 options={SUB_TEMPLATES}
                 onChange={(v) => updateEditing({ subTemplate: v })}
               />
-            </Row>
+            </div>
           </div>
 
           <div className="flex items-center justify-between pt-6">
@@ -205,16 +211,16 @@ export function EncodingTasksPanel() {
   }
 
   return (
-    <div>
-      <h3 className="text-base font-semibold mb-5">任务列表</h3>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-5">
+    <div className="-mt-2 -ml-2">
+      <h3 className="text-sm font-medium mb-4">任务列表</h3>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(208px,1fr))] gap-4">
         <button
           type="button"
           onClick={() => setCreateOpen(true)}
           className="aspect-[16/10] rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition-colors flex items-center justify-center group"
         >
-          <div className="h-14 w-14 rounded-full bg-muted/60 group-hover:bg-primary/20 flex items-center justify-center transition-colors">
-            <Plus className="h-7 w-7 text-muted-foreground group-hover:text-primary" />
+          <div className="h-11 w-11 rounded-full bg-muted/60 group-hover:bg-primary/20 flex items-center justify-center transition-colors">
+            <Plus className="h-6 w-6 text-muted-foreground group-hover:text-primary" />
           </div>
         </button>
 
@@ -222,7 +228,12 @@ export function EncodingTasksPanel() {
           <div
             key={task.id}
             onClick={() => setEditingId(task.id)}
-            className="aspect-[16/10] rounded-lg border-2 border-primary/60 bg-muted/30 hover:border-primary hover:shadow-lg transition-all cursor-pointer p-3 flex flex-col"
+            className={cn(
+              "aspect-[16/10] rounded-lg border-2 hover:shadow-lg transition-all cursor-pointer p-2.5 flex flex-col",
+              task.playing
+                ? "border-[hsl(195_85%_70%)] bg-green-700"
+                : "border-primary/60 bg-muted/30 hover:border-primary",
+            )}
           >
             <div className="flex gap-1.5">
               {task.badges.map((b, i) => (
@@ -238,21 +249,37 @@ export function EncodingTasksPanel() {
               ))}
             </div>
             <div className="flex-1 flex items-center justify-center">
-              <span className="text-lg font-semibold">{task.name}</span>
+              <span
+                className={cn(
+                  "text-base font-semibold",
+                  task.playing && "text-white",
+                )}
+              >
+                {task.name}
+              </span>
             </div>
             <div className="flex justify-end">
               <button
                 type="button"
                 onClick={(e) => togglePlay(task.id, e)}
                 className={cn(
-                  "text-xs font-bold px-3 py-1 rounded border transition-colors flex items-center gap-1",
+                  "text-xs font-bold px-2.5 py-1 rounded transition-colors flex items-center gap-1",
                   task.playing
-                    ? "border-green-500 text-green-400 bg-green-500/10"
-                    : "border-border text-muted-foreground hover:border-primary hover:text-primary",
+                    ? "bg-white text-red-600 hover:bg-white/90"
+                    : "border border-border text-muted-foreground hover:border-primary hover:text-primary",
                 )}
               >
-                <Play className="h-3 w-3" fill="currentColor" />
-                PLAY
+                {task.playing ? (
+                  <>
+                    <Square className="h-3 w-3" fill="currentColor" />
+                    STOP
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-3 w-3" fill="currentColor" />
+                    PLAY
+                  </>
+                )}
               </button>
             </div>
           </div>
