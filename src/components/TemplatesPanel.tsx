@@ -191,9 +191,9 @@ export function TemplatesPanel() {
           </div>
 
           <GLabel>画面大小</GLabel>
-          <div className="col-span-3 w-60">
-            <Sel value={editing.resolution} options={RESOLUTIONS} onChange={(v) => patch({ resolution: v })} />
-          </div>
+          <Sel value={editing.resolution} options={RESOLUTIONS} onChange={(v) => patch({ resolution: v })} />
+          <div className="col-span-2" />
+
 
           <GLabel>视频码率</GLabel>
           <Sel value={editing.bitrateMode} options={BITRATE_MODES} onChange={(v) => patch({ bitrateMode: v })} />
