@@ -368,22 +368,14 @@ export function TemplatesPanel() {
   );
 }
 
-function Label({ children, className }: { children: React.ReactNode; className?: string }) {
+function GLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className={cn("text-sm text-muted-foreground w-20 shrink-0 text-right", className)}>
+    <label className="text-sm text-muted-foreground text-right">
       {children}：
     </label>
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-4">
-      <Label>{label}</Label>
-      <div className="flex-1 min-w-0">{children}</div>
-    </div>
-  );
-}
 
 function Sel({
   value,
