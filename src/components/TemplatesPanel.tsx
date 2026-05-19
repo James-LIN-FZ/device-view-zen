@@ -110,8 +110,8 @@ const AUDIO_CODECS = ["AAC", "MP2", "Opus"];
 const CHANNELS = ["1", "2"];
 const SAMPLE_RATES = ["32KHz", "44.1KHz", "48KHz"];
 const AUDIO_BITRATES = ["64Kbps", "128Kbps", "192Kbps", "256Kbps"];
-const MAIN_STREAMS = ["S-MUX", "RTMP", "SRT"];
-const FORWARDS = ["关闭", "开启"];
+const MAIN_STREAMS = ["关闭", "S-MUX", "RTSP", "RTMP", "SRT", "TS Over UDP", "RTP"];
+const FORWARDS = ["关闭", "S-MUX", "RTSP", "RTMP", "SRT", "TS Over UDP", "RTP"];
 
 const badgeClass = (color: "hd" | "srt" | "follow") =>
   color === "srt"
@@ -191,9 +191,9 @@ export function TemplatesPanel() {
           </div>
 
           <GLabel>画面大小</GLabel>
-          <div className="col-span-3 w-60">
-            <Sel value={editing.resolution} options={RESOLUTIONS} onChange={(v) => patch({ resolution: v })} />
-          </div>
+          <Sel value={editing.resolution} options={RESOLUTIONS} onChange={(v) => patch({ resolution: v })} />
+          <div className="col-span-2" />
+
 
           <GLabel>视频码率</GLabel>
           <Sel value={editing.bitrateMode} options={BITRATE_MODES} onChange={(v) => patch({ bitrateMode: v })} />
@@ -234,14 +234,13 @@ export function TemplatesPanel() {
           </div>
 
           <GLabel>采样率</GLabel>
-          <div className="col-span-3">
-            <Sel value={editing.sampleRate} options={SAMPLE_RATES} onChange={(v) => patch({ sampleRate: v })} />
-          </div>
+          <Sel value={editing.sampleRate} options={SAMPLE_RATES} onChange={(v) => patch({ sampleRate: v })} />
+          <div className="col-span-2" />
 
           <GLabel>音频码率</GLabel>
-          <div className="col-span-3">
-            <Sel value={editing.audioBitrate} options={AUDIO_BITRATES} onChange={(v) => patch({ audioBitrate: v })} />
-          </div>
+          <Sel value={editing.audioBitrate} options={AUDIO_BITRATES} onChange={(v) => patch({ audioBitrate: v })} />
+          <div className="col-span-2" />
+
 
           <div className="col-span-4 border-t border-border my-2" />
 
@@ -270,9 +269,9 @@ export function TemplatesPanel() {
           />
 
           <GLabel>转发</GLabel>
-          <div className="col-span-3">
-            <Sel value={editing.forward} options={FORWARDS} onChange={(v) => patch({ forward: v })} />
-          </div>
+          <Sel value={editing.forward} options={FORWARDS} onChange={(v) => patch({ forward: v })} />
+          <div className="col-span-2" />
+
 
           <GLabel>本地录制</GLabel>
           <div className="col-span-3">
