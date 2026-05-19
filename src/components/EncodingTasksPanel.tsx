@@ -228,12 +228,7 @@ export function EncodingTasksPanel() {
           <div
             key={task.id}
             onClick={() => setEditingId(task.id)}
-            className={cn(
-              "aspect-[16/10] rounded-lg border-2 hover:shadow-lg transition-all cursor-pointer p-2.5 flex flex-col",
-              task.playing
-                ? "border-[hsl(195_85%_70%)] bg-green-700"
-                : "border-primary/60 bg-muted/30 hover:border-primary",
-            )}
+            className="aspect-[16/10] rounded-lg border-2 border-primary/60 bg-muted/30 hover:border-primary hover:shadow-lg transition-all cursor-pointer p-2.5 flex flex-col"
           >
             <div className="flex gap-1.5">
               {task.badges.map((b, i) => (
@@ -252,12 +247,13 @@ export function EncodingTasksPanel() {
               <span
                 className={cn(
                   "text-base font-semibold",
-                  task.playing && "text-white",
+                  task.playing && "text-green-400 animate-pulse",
                 )}
               >
                 {task.name}
               </span>
             </div>
+
             <div className="flex justify-end">
               <button
                 type="button"
