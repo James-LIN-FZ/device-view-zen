@@ -95,6 +95,8 @@ export function DeviceConfigView({
               <EncodingTasksPanel />
             ) : active === "template" ? (
               <TemplatesPanel />
+            ) : active === "osd" ? (
+              <OsdPanel />
             ) : (
               <>
                 <div className="flex items-center gap-2 mb-4">
