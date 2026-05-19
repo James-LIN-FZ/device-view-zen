@@ -234,14 +234,13 @@ export function TemplatesPanel() {
           </div>
 
           <GLabel>采样率</GLabel>
-          <div className="col-span-3">
-            <Sel value={editing.sampleRate} options={SAMPLE_RATES} onChange={(v) => patch({ sampleRate: v })} />
-          </div>
+          <Sel value={editing.sampleRate} options={SAMPLE_RATES} onChange={(v) => patch({ sampleRate: v })} />
+          <div className="col-span-2" />
 
           <GLabel>音频码率</GLabel>
-          <div className="col-span-3">
-            <Sel value={editing.audioBitrate} options={AUDIO_BITRATES} onChange={(v) => patch({ audioBitrate: v })} />
-          </div>
+          <Sel value={editing.audioBitrate} options={AUDIO_BITRATES} onChange={(v) => patch({ audioBitrate: v })} />
+          <div className="col-span-2" />
+
 
           <div className="col-span-4 border-t border-border my-2" />
 
