@@ -29,12 +29,7 @@ export function SystemInfoPanel() {
 
   // 系统操作
   const [controlCmd, setControlCmd] = useState("");
-  const [imgDataUrl, setImgDataUrl] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
 
-  // 升级进度
-  const [showProgress, setShowProgress] = useState(false);
-  const [curProgress, setCurProgress] = useState(0);
 
   // 服务器配置
   const [passwordDialog, setPasswordDialog] = useState(false);
