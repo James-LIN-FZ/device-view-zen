@@ -14,6 +14,7 @@ import type { BackendDevice } from "@/lib/device-api";
 import { EncodingTasksPanel } from "@/components/EncodingTasksPanel";
 import { TemplatesPanel } from "@/components/TemplatesPanel";
 import { OsdPanel } from "@/components/OsdPanel";
+import { NetworkSettingsPanel } from "@/components/NetworkSettingsPanel";
 
 type SectionKey =
   | "encoding"
@@ -97,6 +98,8 @@ export function DeviceConfigView({
               <TemplatesPanel />
             ) : active === "osd" ? (
               <OsdPanel />
+            ) : active === "network" ? (
+              <NetworkSettingsPanel />
             ) : (
               <>
                 <div className="flex items-center gap-2 mb-4">
