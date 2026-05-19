@@ -269,9 +269,9 @@ export function TemplatesPanel() {
           />
 
           <GLabel>转发</GLabel>
-          <div className="col-span-3">
-            <Sel value={editing.forward} options={FORWARDS} onChange={(v) => patch({ forward: v })} />
-          </div>
+          <Sel value={editing.forward} options={FORWARDS} onChange={(v) => patch({ forward: v })} />
+          <div className="col-span-2" />
+
 
           <GLabel>本地录制</GLabel>
           <div className="col-span-3">
