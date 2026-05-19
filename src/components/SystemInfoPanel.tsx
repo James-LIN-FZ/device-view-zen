@@ -206,16 +206,6 @@ export function SystemInfoPanel() {
         </div>
       </section>
 
-      {/* ====== 升级进度 ====== */}
-      <Dialog open={showProgress}>
-        <DialogContent className="sm:max-w-xs">
-          <DialogHeader>
-            <DialogTitle>升级中</DialogTitle>
-          </DialogHeader>
-          <Progress value={curProgress} />
-          <p className="text-center text-sm text-muted-foreground">{curProgress}%</p>
-        </DialogContent>
-      </Dialog>
 
       {/* ====== 管理员密码 ====== */}
       <Dialog open={passwordDialog} onOpenChange={setPasswordDialog}>
