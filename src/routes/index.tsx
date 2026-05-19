@@ -352,6 +352,10 @@ function Dashboard() {
                 <div className="row-span-2 min-h-0">
                   <SmartStreamView devices={devices} selectedSn={selectedId} />
                 </div>
+              ) : activeView === "config" ? (
+                <div className="row-span-2 min-h-0">
+                  <DeviceConfigView devices={devices} selectedSn={selectedId} />
+                </div>
               ) : (
                 <div className="row-span-2 min-h-0">
                   <MonitorView devices={devices} />
