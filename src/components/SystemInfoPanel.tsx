@@ -220,22 +220,6 @@ export function SystemInfoPanel() {
               确认
             </Button>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground w-20 shrink-0">固件升级：</span>
-            <Input value={imgDataUrl} readOnly className="h-8 w-80" placeholder="未选择文件" />
-            <Button size="sm" onClick={handleUpload}>
-              <Upload className="h-3.5 w-3.5 mr-1" />
-              点击上传
-            </Button>
-            <input
-              ref={fileRef}
-              type="file"
-              className="hidden"
-              onChange={onFileChange}
-              accept=".pkg,.bin,.img"
-            />
-          </div>
-          <p className="text-xs text-amber-500">注意：在升级过程中请勿断开连接或断电</p>
           <div className="flex gap-3 pt-1">
             <Button variant="outline" size="sm" onClick={reboot}>
               重启
