@@ -8,6 +8,7 @@ import { NetworkPanel } from "@/components/NetworkPanel";
 import { UserManagementView } from "@/components/UserManagementView";
 import { MonitorView } from "@/components/MonitorView";
 import { SmartStreamView } from "@/components/SmartStreamView";
+import { DeviceConfigView } from "@/components/DeviceConfigView";
 import { getAuthToken, isAuthenticated } from "@/lib/auth";
 import { fetchDeviceNetwork, fetchDeviceStatus, fetchMyDevices, updateDeviceName, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
 
