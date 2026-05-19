@@ -16,6 +16,7 @@ import { TemplatesPanel } from "@/components/TemplatesPanel";
 import { OsdPanel } from "@/components/OsdPanel";
 import { NetworkSettingsPanel } from "@/components/NetworkSettingsPanel";
 import { VoiceCallPanel } from "@/components/VoiceCallPanel";
+import { SystemInfoPanel } from "@/components/SystemInfoPanel";
 
 type SectionKey =
   | "encoding"
