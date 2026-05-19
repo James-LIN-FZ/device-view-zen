@@ -232,6 +232,13 @@ function Dashboard() {
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(String(event.data)) as DeviceWsMessage;
+        if (msg.type === "rpc.reply") {
+          if (msg.payload && typeof msg.payload === "object") {
+            setRPCNotice(msg.payload as RPCNoticePayload);
+          }
+          return;
+        }
+
         if (msg.type !== "rpc.reply" && typeof msg.online === "boolean") {
           setDeviceOnline(msg.online);
           setDevices((current) =>
@@ -254,12 +261,6 @@ function Dashboard() {
         if (msg.type === "network") {
           scheduleNetworkFetch();
           return;
-        }
-
-        if (msg.type === "rpc.reply") {
-          if (msg.payload && typeof msg.payload === "object") {
-            setRPCNotice(msg.payload as RPCNoticePayload);
-          }
         }
       } catch {
         // Ignore malformed messages and keep current UI state.

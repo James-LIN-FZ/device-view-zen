@@ -2,7 +2,52 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, Video, Settings2, Save, Play, Square, RefreshCw, X } from "lucide-react";
 import { fetchDeviceRPCReply, requestDeviceRPC, type BackendDeviceStatusData } from "@/lib/device-api";
 
-const DEFAULT_ENCODE_TASKS: string[] = [];
+type EncodeTaskTemplateData = {
+  id?: number;
+  iMainABitrate?: number;
+  iMainAChannels?: number;
+  iMainASampleRate?: number;
+  iMainVBitrate?: number;
+  iMainVFps?: number;
+  iMainVGop?: number;
+  iMainVHeight?: number;
+  iMainVWidth?: number;
+  iOsd?: number;
+  iSubEnable?: number;
+  sMainACodec?: string;
+  sMainOutput1Addr?: string;
+  sMainOutput1Param?: unknown;
+  sMainOutput1Protocol?: string;
+  sMainOutput2Addr?: string;
+  sMainOutput2Param?: string;
+  sMainOutput2Protocol?: string;
+  sMainVCodec?: string;
+  sMainVMode?: string;
+  sMainVRC?: string;
+  sMainVScaleMode?: string;
+  sName?: string;
+};
+
+type EncodeTask = {
+  key: string;
+  id?: number | string;
+  name: string;
+  enabled: boolean;
+  iSubTemplate?: number;
+  iTemplate?: number;
+  sAudio?: string;
+  sDeinterlace?: string;
+  sDevice?: string;
+  sResolution?: string;
+  sSpecial?: string;
+  sStatus?: string;
+  sSubTemplate?: string;
+  sTemplate?: string;
+  template?: EncodeTaskTemplateData;
+  raw: Record<string, unknown>;
+};
+
+const DEFAULT_ENCODE_TASKS: EncodeTask[] = [];
 
 type EncodingForm = {
   videoSource: string;
@@ -30,32 +75,186 @@ type RPCNoticePayload = {
   path?: string;
 };
 
-function parseEncodeTasks(payload: unknown): string[] {
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function toNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
+function parseTaskBitrateMbps(value: unknown): number {
+  const raw = toNumber(value);
+  if (!raw || raw <= 0) {
+    return 8;
+  }
+  if (raw >= 1_000_000) {
+    return clamp(Math.round(raw / 1_000_000), 1, 50);
+  }
+  if (raw >= 1_000) {
+    return clamp(Math.round(raw / 1_000), 1, 50);
+  }
+  return clamp(Math.round(raw), 1, 50);
+}
+
+function parseLatencyMs(value: unknown): number {
+  const defaultLatency = 500;
+  if (value && typeof value === "object") {
+    const objValue = (value as Record<string, unknown>).latency;
+    const num = toNumber(objValue);
+    return num ? clamp(Math.round(num), 100, 5000) : defaultLatency;
+  }
+  if (typeof value !== "string") {
+    return defaultLatency;
+  }
+  const text = value.trim();
+  if (!text) {
+    return defaultLatency;
+  }
+  try {
+    const decoded = JSON.parse(text) as Record<string, unknown>;
+    const num = toNumber(decoded.latency);
+    return num ? clamp(Math.round(num), 100, 5000) : defaultLatency;
+  } catch {
+    return defaultLatency;
+  }
+}
+
+function getTaskBitrateMbps(task: EncodeTask | null | undefined): number {
+  return parseTaskBitrateMbps(task?.template?.iMainVBitrate);
+}
+
+function getTaskLatencyMs(task: EncodeTask | null | undefined): number {
+  return parseLatencyMs(task?.template?.sMainOutput1Param);
+}
+
+function cloneTask(task: EncodeTask | null | undefined): EncodeTask | null {
+  if (!task) {
+    return null;
+  }
+  return {
+    ...task,
+    template: task.template ? { ...task.template } : undefined,
+    raw: { ...task.raw },
+  };
+}
+
+function updateTaskLatency(task: EncodeTask | null, latencyMs: number): EncodeTask | null {
+  if (!task) {
+    return null;
+  }
+  const nextLatency = clamp(Math.round(latencyMs), 100, 5000);
+  const nextTemplate: EncodeTaskTemplateData = {
+    ...(task.template || {}),
+    sMainOutput1Param: JSON.stringify({ latency: nextLatency }),
+  };
+  return {
+    ...task,
+    template: nextTemplate,
+  };
+}
+
+function updateTaskBitrate(task: EncodeTask | null, bitrateMbps: number): EncodeTask | null {
+  if (!task) {
+    return null;
+  }
+  const nextBitrate = clamp(Math.round(bitrateMbps), 1, 50);
+  const nextTemplate: EncodeTaskTemplateData = {
+    ...(task.template || {}),
+    iMainVBitrate: nextBitrate * 1_000_000,
+  };
+  return {
+    ...task,
+    template: nextTemplate,
+  };
+}
+
+function parseEncodeTasks(payload: unknown): EncodeTask[] {
   if (!Array.isArray(payload)) {
     return [];
   }
-  const tasks = payload
-    .map((item, index) => {
+
+  return payload
+    .map((item, index): EncodeTask | null => {
       if (!item || typeof item !== "object") {
-        return "";
+        return null;
       }
       const row = item as Record<string, unknown>;
+      const id = row.id;
+      const key =
+        typeof id === "string" || typeof id === "number"
+          ? String(id)
+          : `task_${index + 1}`;
       const name =
         (typeof row.sName === "string" && row.sName.trim()) ||
         (typeof row.name === "string" && row.name.trim()) ||
         (typeof row.title === "string" && row.title.trim()) ||
-        "";
-      if (name) {
-        return name;
+        (typeof id === "string" || typeof id === "number" ? `任务 ${id}` : `任务 ${index + 1}`);
+      const rawTemplate = row.template && typeof row.template === "object"
+        ? (row.template as Record<string, unknown>)
+        : undefined;
+      const enableValue = row.iEnable;
+      const enabled = enableValue === 1 || enableValue === "1" || enableValue === true;
+      const bitrateSource = rawTemplate?.iMainVBitrate ?? row.iMainVBitrate;
+      const latencySource = rawTemplate?.sMainOutput1Param ?? row.sMainOutput1Param;
+      const template: EncodeTaskTemplateData = {
+        iMainVBitrate: toNumber(bitrateSource) ?? undefined,
+        sMainOutput1Param: latencySource,
+      };
+
+      if (rawTemplate && typeof rawTemplate === "object") {
+        template.id = toNumber(rawTemplate.id) ?? undefined;
+        template.iMainABitrate = toNumber(rawTemplate.iMainABitrate) ?? undefined;
+        template.iMainAChannels = toNumber(rawTemplate.iMainAChannels) ?? undefined;
+        template.iMainASampleRate = toNumber(rawTemplate.iMainASampleRate) ?? undefined;
+        template.iMainVFps = toNumber(rawTemplate.iMainVFps) ?? undefined;
+        template.iMainVGop = toNumber(rawTemplate.iMainVGop) ?? undefined;
+        template.iMainVHeight = toNumber(rawTemplate.iMainVHeight) ?? undefined;
+        template.iMainVWidth = toNumber(rawTemplate.iMainVWidth) ?? undefined;
+        template.iOsd = toNumber(rawTemplate.iOsd) ?? undefined;
+        template.iSubEnable = toNumber(rawTemplate.iSubEnable) ?? undefined;
+        template.sMainACodec = typeof rawTemplate.sMainACodec === "string" ? rawTemplate.sMainACodec : undefined;
+        template.sMainOutput1Addr = typeof rawTemplate.sMainOutput1Addr === "string" ? rawTemplate.sMainOutput1Addr : undefined;
+        template.sMainOutput1Protocol = typeof rawTemplate.sMainOutput1Protocol === "string" ? rawTemplate.sMainOutput1Protocol : undefined;
+        template.sMainOutput2Addr = typeof rawTemplate.sMainOutput2Addr === "string" ? rawTemplate.sMainOutput2Addr : undefined;
+        template.sMainOutput2Param = typeof rawTemplate.sMainOutput2Param === "string" ? rawTemplate.sMainOutput2Param : undefined;
+        template.sMainOutput2Protocol = typeof rawTemplate.sMainOutput2Protocol === "string" ? rawTemplate.sMainOutput2Protocol : undefined;
+        template.sMainVCodec = typeof rawTemplate.sMainVCodec === "string" ? rawTemplate.sMainVCodec : undefined;
+        template.sMainVMode = typeof rawTemplate.sMainVMode === "string" ? rawTemplate.sMainVMode : undefined;
+        template.sMainVRC = typeof rawTemplate.sMainVRC === "string" ? rawTemplate.sMainVRC : undefined;
+        template.sMainVScaleMode = typeof rawTemplate.sMainVScaleMode === "string" ? rawTemplate.sMainVScaleMode : undefined;
+        template.sName = typeof rawTemplate.sName === "string" ? rawTemplate.sName : undefined;
       }
-      const id = row.id;
-      if (typeof id === "string" || typeof id === "number") {
-        return `任务 ${id}`;
-      }
-      return `任务 ${index + 1}`;
+
+      return {
+        key,
+        id: typeof id === "string" || typeof id === "number" ? id : undefined,
+        name,
+        enabled,
+        iSubTemplate: toNumber(row.iSubTemplate) ?? undefined,
+        iTemplate: toNumber(row.iTemplate) ?? undefined,
+        sAudio: typeof row.sAudio === "string" ? row.sAudio : undefined,
+        sDeinterlace: typeof row.sDeinterlace === "string" ? row.sDeinterlace : undefined,
+        sDevice: typeof row.sDevice === "string" ? row.sDevice : undefined,
+        sResolution: typeof row.sResolution === "string" ? row.sResolution : undefined,
+        sSpecial: typeof row.sSpecial === "string" ? row.sSpecial : undefined,
+        sStatus: typeof row.sStatus === "string" ? row.sStatus : undefined,
+        sSubTemplate: typeof row.sSubTemplate === "string" ? row.sSubTemplate : undefined,
+        sTemplate: typeof row.sTemplate === "string" ? row.sTemplate : undefined,
+        template,
+        raw: row,
+      };
     })
-    .filter((name) => !!name);
-  return Array.from(new Set(tasks));
+    .filter((item): item is EncodeTask => item !== null);
 }
 
 function normalizeVideoSource(value?: string): string {
@@ -204,12 +403,12 @@ export function EncodingPanel({
 }) {
   const fallbackCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [form, setForm] = useState<EncodingForm>(() => buildForm(status));
-  const [bitrateNum, setBitrateNum] = useState(() => parseVideoBitrate(status) || 8);
-  const [latency, setLatency] = useState(500);
-  const [encodeTasks, setEncodeTasks] = useState<string[]>(DEFAULT_ENCODE_TASKS);
+  const [encodeTasks, setEncodeTasks] = useState<EncodeTask[]>(DEFAULT_ENCODE_TASKS);
   const [taskLoading, setTaskLoading] = useState(false);
   const [task, setTask] = useState("");
+  const [currentTask, setCurrentTask] = useState<EncodeTask | null>(null);
   const [running, setRunning] = useState(false);
+  const [hasRunningTask, setHasRunningTask] = useState(false);
   const [localRecordingEnabled, setLocalRecordingEnabled] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [webrtcOpen, setWebrtcOpen] = useState(false);
@@ -217,8 +416,18 @@ export function EncodingPanel({
   const [previewLoadFailed, setPreviewLoadFailed] = useState(false);
   const [webrtcNonce, setWebrtcNonce] = useState(0);
   const pendingRequestIdRef = useRef("");
+  const recentWSRequestIdRef = useRef("");
   const pollTimerRef = useRef<number | null>(null);
   const timeoutTimerRef = useRef<number | null>(null);
+
+  const delay = (ms: number) => new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+
+  const isEncodePath = (value: string): boolean => {
+    const path = value.trim();
+    return path === "/encode" || path.startsWith("/encode/");
+  };
 
   const clearReplyTimers = () => {
     if (pollTimerRef.current != null) {
@@ -234,10 +443,27 @@ export function EncodingPanel({
   const applyReplyResult = (statusValue: string, data: unknown) => {
     if (statusValue !== "ok") {
       setEncodeTasks(DEFAULT_ENCODE_TASKS);
+      setTask("");
+      setRunning(false);
+      setHasRunningTask(false);
       return true;
     }
     const parsedTasks = parseEncodeTasks(data);
     setEncodeTasks(parsedTasks.length > 0 ? parsedTasks : DEFAULT_ENCODE_TASKS);
+    if (parsedTasks.length === 0) {
+      setTask("");
+      setRunning(false);
+      setHasRunningTask(false);
+      return true;
+    }
+
+    const enabledTask = parsedTasks.find((item) => item.enabled);
+    const activeTask = enabledTask || parsedTasks[0];
+    setTask(activeTask.key);
+    setCurrentTask(cloneTask(activeTask));
+    setRunning(activeTask.enabled);
+    setHasRunningTask(!!enabledTask);
+    setDirty(false);
     return true;
   };
 
@@ -249,13 +475,16 @@ export function EncodingPanel({
     if (!reply) {
       return false;
     }
-    if ((reply.path || "").trim() !== "/encode") {
+    const replyPath = (reply.path || "").trim();
+    if (!isEncodePath(replyPath)) {
       return false;
     }
     if (reply.status === "pending") {
       return false;
     }
-    const done = applyReplyResult(reply.status, reply.data);
+    const done = replyPath === "/encode"
+      ? applyReplyResult(reply.status, reply.data)
+      : true;
     if (done) {
       pendingRequestIdRef.current = "";
       setTaskLoading(false);
@@ -265,41 +494,21 @@ export function EncodingPanel({
   };
 
   const resetEditPanel = () => {
-    setLatency(500);
-    setBitrateNum(parseVideoBitrate(status) || 8);
-    setTask(encodeTasks[0] || DEFAULT_ENCODE_TASKS[0]);
-    setRunning(false);
+    const selectedTask = encodeTasks.find((item) => item.key === task) || encodeTasks[0] || null;
+    setCurrentTask(cloneTask(selectedTask));
+    setTask(selectedTask?.key || "");
+    setRunning(selectedTask?.enabled ?? false);
     setLocalRecordingEnabled(false);
     setDirty(false);
   };
 
-  useEffect(() => {
-    setForm(buildForm(status));
-    setBitrateNum(parseVideoBitrate(status) || 8);
-    setDirty(false);
-  }, [status]);
-
-  useEffect(() => {
-    if (encodeTasks.length === 0) {
-      return;
-    }
-    if (!encodeTasks.includes(task)) {
-      setTask(encodeTasks[0]);
-    }
-  }, [encodeTasks, task]);
-
-  useEffect(() => {
-    if (!serialNo) {
+  const refreshEncodeTasks = () => {
+    if (!serialNo || !online) {
       setEncodeTasks(DEFAULT_ENCODE_TASKS);
       setTask("");
-      setTaskLoading(false);
-      pendingRequestIdRef.current = "";
-      clearReplyTimers();
-      return;
-    }
-    if (!online) {
-      setEncodeTasks(DEFAULT_ENCODE_TASKS);
-      setTask("");
+      setCurrentTask(null);
+      setRunning(false);
+      setHasRunningTask(false);
       setTaskLoading(false);
       pendingRequestIdRef.current = "";
       clearReplyTimers();
@@ -322,6 +531,11 @@ export function EncodingPanel({
           return;
         }
         pendingRequestIdRef.current = requestId;
+
+        // If WS notice arrived slightly earlier than pending id assignment, fetch immediately.
+        if (recentWSRequestIdRef.current === requestId) {
+          void fetchReplyByID(requestId);
+        }
 
         const poll = async () => {
           if (!pendingRequestIdRef.current || pendingRequestIdRef.current !== requestId) {
@@ -346,6 +560,10 @@ export function EncodingPanel({
           clearReplyTimers();
           setTaskLoading(false);
           setEncodeTasks(DEFAULT_ENCODE_TASKS);
+          setTask("");
+          setCurrentTask(null);
+          setRunning(false);
+          setHasRunningTask(false);
         }, 15000);
       })
       .catch(() => {
@@ -353,6 +571,10 @@ export function EncodingPanel({
           return;
         }
         setEncodeTasks(DEFAULT_ENCODE_TASKS);
+        setTask("");
+        setCurrentTask(null);
+        setRunning(false);
+        setHasRunningTask(false);
         setTaskLoading(false);
       });
 
@@ -361,19 +583,103 @@ export function EncodingPanel({
       pendingRequestIdRef.current = "";
       clearReplyTimers();
     };
+  };
+
+  const waitRPCDone = async (requestId: string, timeoutMs = 15000): Promise<boolean> => {
+    if (!serialNo || !requestId) {
+      return false;
+    }
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      const reply = await fetchDeviceRPCReply(serialNo, requestId);
+      if (reply && reply.status !== "pending" && isEncodePath(reply.path || "")) {
+        return reply.status === "ok";
+      }
+      await delay(500);
+    }
+    return false;
+  };
+
+  const toggleTaskRunning = async () => {
+    if (!serialNo || !online || !currentTask) {
+      return;
+    }
+    const taskId = currentTask.id ?? currentTask.key;
+    if (taskId === undefined || taskId === null || String(taskId).trim() === "") {
+      return;
+    }
+
+    const action = running ? "disable" : "enable";
+    try {
+      setTaskLoading(true);
+      const ack = await requestDeviceRPC(serialNo, {
+        method: "POST",
+        path: `/encode/${String(taskId).trim()}/${action}`,
+      });
+      const requestId = (ack.requestId || "").trim();
+      if (requestId) {
+        const ok = await waitRPCDone(requestId, (ack.timeoutSeconds || 15) * 1000);
+        if (!ok) {
+          setTaskLoading(false);
+          return;
+        }
+      }
+      refreshEncodeTasks();
+    } catch {
+      setTaskLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setForm(buildForm(status));
+    setDirty(false);
+  }, [status]);
+
+  useEffect(() => {
+    if (encodeTasks.length === 0) {
+      if (task !== "") {
+        setTask("");
+      }
+      if (currentTask !== null) {
+        setCurrentTask(null);
+      }
+      setRunning(false);
+      setHasRunningTask(false);
+      return;
+    }
+    const selectedTask = encodeTasks.find((item) => item.key === task);
+    if (!selectedTask) {
+      const first = encodeTasks[0];
+      setTask(first.key);
+      setCurrentTask(cloneTask(first));
+      setRunning(first.enabled);
+      setHasRunningTask(first.enabled);
+      return;
+    }
+    setRunning(selectedTask.enabled);
+    setHasRunningTask(selectedTask.enabled);
+  }, [currentTask, encodeTasks, task]);
+
+  useEffect(() => {
+    const cleanup = refreshEncodeTasks();
+    return cleanup;
   }, [online, serialNo]);
 
+  const taskSelectDisabled = !online || hasRunningTask;
+  const currentTaskLatency = getTaskLatencyMs(currentTask);
+  const currentTaskBitrate = getTaskBitrateMbps(currentTask);
   useEffect(() => {
     if (!rpcNotice || !serialNo) {
       return;
     }
     const requestId = (rpcNotice.requestId || "").trim();
+    if (requestId) {
+      recentWSRequestIdRef.current = requestId;
+    }
     if (!requestId || requestId !== pendingRequestIdRef.current) {
       return;
     }
-    if ((rpcNotice.path || "").trim() !== "/encode") {
-      return;
-    }
+    // RequestId is unique per RPC call; matching it is enough to trigger immediate reply fetch.
     void fetchReplyByID(requestId);
   }, [rpcNotice, serialNo]);
 
@@ -597,20 +903,28 @@ export function EncodingPanel({
                   min={100}
                   max={5000}
                   step={50}
-                  value={latency}
-                  onChange={(e) => { setLatency(+e.target.value); setDirty(true); }}
+                  value={currentTaskLatency}
+                  onChange={(e) => {
+                    const next = updateTaskLatency(currentTask, +e.target.value);
+                    setCurrentTask(next);
+                    setDirty(true);
+                  }}
                   className="flex-1 accent-[var(--color-primary)]"
-                  disabled={!online}
+                  disabled={!online || !currentTask}
                 />
                 <input
                   type="number"
                   min={100}
                   max={5000}
                   step={50}
-                  value={latency}
-                  onChange={(e) => { setLatency(+e.target.value); setDirty(true); }}
+                  value={currentTaskLatency}
+                  onChange={(e) => {
+                    const next = updateTaskLatency(currentTask, +e.target.value);
+                    setCurrentTask(next);
+                    setDirty(true);
+                  }}
                   className="w-16 bg-input border border-border rounded-sm px-1.5 py-0.5 text-[11px] text-right focus:outline-none focus:border-primary"
-                  disabled={!online}
+                  disabled={!online || !currentTask}
                 />
               </div>
             </Field>
@@ -620,19 +934,27 @@ export function EncodingPanel({
                   type="range"
                   min={1}
                   max={50}
-                  value={bitrateNum}
-                  onChange={(e) => { setBitrateNum(+e.target.value); setDirty(true); }}
+                  value={currentTaskBitrate}
+                  onChange={(e) => {
+                    const next = updateTaskBitrate(currentTask, +e.target.value);
+                    setCurrentTask(next);
+                    setDirty(true);
+                  }}
                   className="flex-1 accent-[var(--color-primary)]"
-                  disabled={!online}
+                  disabled={!online || !currentTask}
                 />
                 <input
                   type="number"
                   min={1}
                   max={50}
-                  value={bitrateNum}
-                  onChange={(e) => { setBitrateNum(+e.target.value); setDirty(true); }}
+                  value={currentTaskBitrate}
+                  onChange={(e) => {
+                    const next = updateTaskBitrate(currentTask, +e.target.value);
+                    setCurrentTask(next);
+                    setDirty(true);
+                  }}
                   className="w-16 bg-input border border-border rounded-sm px-1.5 py-0.5 text-[11px] text-right focus:outline-none focus:border-primary"
-                  disabled={!online}
+                  disabled={!online || !currentTask}
                 />
               </div>
             </Field>
@@ -659,12 +981,28 @@ export function EncodingPanel({
               <Save className="h-3 w-3" /> 应用
             </button>
             <Field label="编码任务">
-              <Select value={task} onChange={(v) => { setTask(v); setDirty(true); }} options={encodeTasks} />
+              <Select
+                value={task}
+                onChange={(v) => {
+                  setTask(v);
+                  const selectedTask = encodeTasks.find((item) => item.key === v);
+                  if (selectedTask) {
+                    setCurrentTask(cloneTask(selectedTask));
+                    setRunning(selectedTask.enabled);
+                  }
+                  setDirty(true);
+                }}
+                options={encodeTasks}
+                disabled={taskSelectDisabled}
+              />
               {taskLoading ? <div className="mt-1 text-[10px] text-muted-foreground">后台同步任务中...</div> : null}
+              {hasRunningTask ? <div className="mt-1 text-[10px] text-warning">任务运行中，无法切换</div> : null}
             </Field>
             <button
-              onClick={() => setRunning((r) => !r)}
-              disabled={!online}
+              onClick={() => {
+                void toggleTaskRunning();
+              }}
+              disabled={!online || !currentTask || taskLoading}
               className={`w-full inline-flex items-center justify-center gap-1.5 rounded-sm px-2 py-2 text-[11px] font-medium transition disabled:opacity-50 disabled:cursor-not-allowed ${
                 running
                   ? "bg-destructive/15 text-destructive border border-destructive/40 hover:bg-destructive/25"
@@ -700,16 +1038,27 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Select({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
-  const has = options.includes(value);
+function Select({
+  value,
+  onChange,
+  options,
+  disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: EncodeTask[];
+  disabled?: boolean;
+}) {
+  const has = options.some((item) => item.key === value);
   return (
     <select
       value={has ? value : ""}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-input border border-border rounded-sm px-2 py-1 text-[11px] focus:outline-none focus:border-primary"
+      disabled={disabled}
+      className="w-full bg-input border border-border rounded-sm px-2 py-1 text-[11px] focus:outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {!has && <option value="" disabled>{value || "—"}</option>}
-      {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      {options.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}
     </select>
   );
 }
