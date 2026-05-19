@@ -1,8 +1,7 @@
-import { useRef, useState } from "react";
-import { Eye, EyeOff, CheckCircle2, XCircle, Upload } from "lucide-react";
+import { useState } from "react";
+import { Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -11,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+
 
 export function SystemInfoPanel() {
   // 系统信息
