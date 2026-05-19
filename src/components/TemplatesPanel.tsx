@@ -173,37 +173,31 @@ export function TemplatesPanel() {
           <h3 className="text-sm font-medium">修改模板</h3>
         </div>
 
-        <div className="max-w-4xl space-y-5">
-          <Row label="模板名">
+        <div className="max-w-4xl grid grid-cols-[5rem_11rem_5rem_1fr] gap-x-3 gap-y-2.5 items-center">
+          <GLabel>模板名</GLabel>
+          <div className="col-span-3">
             <Input
               value={editing.name}
               onChange={(e) => patch({ name: e.target.value })}
               className="max-w-xs"
             />
-          </Row>
-
-          <div className="flex items-center gap-4">
-            <Label>视频编码</Label>
-            <div className="w-44">
-              <Sel value={editing.videoCodec} options={VIDEO_CODECS} onChange={(v) => patch({ videoCodec: v })} />
-            </div>
-            <Label className="ml-4">码率控制</Label>
-            <div className="w-44">
-              <Sel value={editing.rateControl} options={RATE_CTRL} onChange={(v) => patch({ rateControl: v })} />
-            </div>
           </div>
 
-          <Row label="画面大小">
-            <div className="w-60">
-              <Sel value={editing.resolution} options={RESOLUTIONS} onChange={(v) => patch({ resolution: v })} />
-            </div>
-          </Row>
+          <GLabel>视频编码</GLabel>
+          <Sel value={editing.videoCodec} options={VIDEO_CODECS} onChange={(v) => patch({ videoCodec: v })} />
+          <GLabel>码率控制</GLabel>
+          <div className="w-44">
+            <Sel value={editing.rateControl} options={RATE_CTRL} onChange={(v) => patch({ rateControl: v })} />
+          </div>
 
-          <div className="flex items-center gap-4">
-            <Label>视频码率</Label>
-            <div className="w-44">
-              <Sel value={editing.bitrateMode} options={BITRATE_MODES} onChange={(v) => patch({ bitrateMode: v })} />
-            </div>
+          <GLabel>画面大小</GLabel>
+          <div className="col-span-3 w-60">
+            <Sel value={editing.resolution} options={RESOLUTIONS} onChange={(v) => patch({ resolution: v })} />
+          </div>
+
+          <GLabel>视频码率</GLabel>
+          <Sel value={editing.bitrateMode} options={BITRATE_MODES} onChange={(v) => patch({ bitrateMode: v })} />
+          <div className="col-span-2 flex items-center gap-2">
             <Input
               type="number"
               value={editing.videoBitrate}
@@ -213,104 +207,96 @@ export function TemplatesPanel() {
             <span className="text-sm text-muted-foreground">kbps</span>
           </div>
 
-          <div className="flex items-center gap-4">
-            <Label>输出帧率</Label>
-            <div className="w-44">
-              <Sel value={editing.frameRate} options={FRAME_RATES} onChange={(v) => patch({ frameRate: v })} />
-            </div>
-            <Label className="ml-4">OSD</Label>
+          <GLabel>输出帧率</GLabel>
+          <Sel value={editing.frameRate} options={FRAME_RATES} onChange={(v) => patch({ frameRate: v })} />
+          <GLabel>OSD</GLabel>
+          <div>
             <Checkbox checked={editing.osd} onCheckedChange={(v) => patch({ osd: !!v })} />
           </div>
 
-          <Row label="GOP">
+          <GLabel>GOP</GLabel>
+          <div className="col-span-3">
             <Input
               type="number"
               value={editing.gop}
               onChange={(e) => patch({ gop: Number(e.target.value) })}
               className="w-32"
             />
-          </Row>
-
-          <div className="border-t border-border pt-5" />
-
-          <div className="flex items-center gap-4">
-            <Label>音频编码</Label>
-            <div className="w-44">
-              <Sel value={editing.audioCodec} options={AUDIO_CODECS} onChange={(v) => patch({ audioCodec: v })} />
-            </div>
-            <Label className="ml-4">声道数</Label>
-            <div className="w-44">
-              <Sel value={editing.channels} options={CHANNELS} onChange={(v) => patch({ channels: v })} />
-            </div>
           </div>
-          <Row label="采样率">
-            <div className="w-44">
-              <Sel value={editing.sampleRate} options={SAMPLE_RATES} onChange={(v) => patch({ sampleRate: v })} />
-            </div>
-          </Row>
-          <Row label="音频码率">
-            <div className="w-44">
-              <Sel value={editing.audioBitrate} options={AUDIO_BITRATES} onChange={(v) => patch({ audioBitrate: v })} />
-            </div>
-          </Row>
 
-          <div className="border-t border-border pt-5" />
+          <div className="col-span-4 border-t border-border my-2" />
 
-          <div className="flex items-start gap-4">
-            <Label>主流</Label>
-            <div className="w-44">
-              <Sel value={editing.mainStream} options={MAIN_STREAMS} onChange={(v) => patch({ mainStream: v })} />
-            </div>
-            <Label className="ml-4">聚合地址</Label>
-            <Input
-              value={editing.aggregateAddress}
-              onChange={(e) => patch({ aggregateAddress: e.target.value })}
-              className="flex-1 min-w-0 max-w-md"
-            />
+          <GLabel>音频编码</GLabel>
+          <Sel value={editing.audioCodec} options={AUDIO_CODECS} onChange={(v) => patch({ audioCodec: v })} />
+          <GLabel>声道数</GLabel>
+          <div className="w-44">
+            <Sel value={editing.channels} options={CHANNELS} onChange={(v) => patch({ channels: v })} />
           </div>
-          <div className="flex items-center gap-4">
-            <Label>延迟(ms)</Label>
-            <Input
-              type="number"
-              value={editing.delayMs}
-              onChange={(e) => patch({ delayMs: Number(e.target.value) })}
-              className="w-32"
-            />
-            <Label className="ml-4">拉流密钥</Label>
-            <Input
-              value={editing.pullKey}
-              onChange={(e) => patch({ pullKey: e.target.value })}
-              placeholder="默认空"
-              className="flex-1 max-w-xs"
-            />
+
+          <GLabel>采样率</GLabel>
+          <div className="col-span-3">
+            <Sel value={editing.sampleRate} options={SAMPLE_RATES} onChange={(v) => patch({ sampleRate: v })} />
           </div>
-          <Row label="转发">
-            <div className="w-44">
-              <Sel value={editing.forward} options={FORWARDS} onChange={(v) => patch({ forward: v })} />
-            </div>
-          </Row>
-          <div className="flex items-center gap-4">
-            <Label>本地录制</Label>
+
+          <GLabel>音频码率</GLabel>
+          <div className="col-span-3">
+            <Sel value={editing.audioBitrate} options={AUDIO_BITRATES} onChange={(v) => patch({ audioBitrate: v })} />
+          </div>
+
+          <div className="col-span-4 border-t border-border my-2" />
+
+          <GLabel>主流</GLabel>
+          <Sel value={editing.mainStream} options={MAIN_STREAMS} onChange={(v) => patch({ mainStream: v })} />
+          <GLabel>聚合地址</GLabel>
+          <Input
+            value={editing.aggregateAddress}
+            onChange={(e) => patch({ aggregateAddress: e.target.value })}
+            className="max-w-md"
+          />
+
+          <GLabel>延迟(ms)</GLabel>
+          <Input
+            type="number"
+            value={editing.delayMs}
+            onChange={(e) => patch({ delayMs: Number(e.target.value) })}
+            className="w-32"
+          />
+          <GLabel>拉流密钥</GLabel>
+          <Input
+            value={editing.pullKey}
+            onChange={(e) => patch({ pullKey: e.target.value })}
+            placeholder="默认空"
+            className="max-w-xs"
+          />
+
+          <GLabel>转发</GLabel>
+          <div className="col-span-3">
+            <Sel value={editing.forward} options={FORWARDS} onChange={(v) => patch({ forward: v })} />
+          </div>
+
+          <GLabel>本地录制</GLabel>
+          <div className="col-span-3">
             <Checkbox
               checked={editing.localRecord}
               onCheckedChange={(v) => patch({ localRecord: !!v })}
             />
           </div>
+        </div>
 
-          <div className="flex items-center justify-between pt-6">
-            <div className="flex gap-3">
-              <Button onClick={() => setEditingId(null)}>确定</Button>
-              <Button variant="secondary" onClick={() => setEditingId(null)}>取消</Button>
-            </div>
-            <Button variant="destructive" onClick={handleDelete} className="gap-1">
-              <Trash2 className="h-4 w-4" />
-              删除
-            </Button>
+        <div className="max-w-4xl flex items-center justify-between pt-6">
+          <div className="flex gap-3">
+            <Button onClick={() => setEditingId(null)}>确定</Button>
+            <Button variant="secondary" onClick={() => setEditingId(null)}>取消</Button>
           </div>
+          <Button variant="destructive" onClick={handleDelete} className="gap-1">
+            <Trash2 className="h-4 w-4" />
+            删除
+          </Button>
         </div>
       </div>
     );
   }
+
 
   return (
     <div className="-mt-2 -ml-2">
@@ -382,22 +368,14 @@ export function TemplatesPanel() {
   );
 }
 
-function Label({ children, className }: { children: React.ReactNode; className?: string }) {
+function GLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className={cn("text-sm text-muted-foreground w-20 shrink-0 text-right", className)}>
+    <label className="text-sm text-muted-foreground text-right">
       {children}：
     </label>
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-4">
-      <Label>{label}</Label>
-      <div className="flex-1 min-w-0">{children}</div>
-    </div>
-  );
-}
 
 function Sel({
   value,
