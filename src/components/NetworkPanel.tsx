@@ -216,7 +216,7 @@ export function NetworkPanel({ serialNo, online, payload }: { serialNo: string; 
               </div>
               <div className="flex-1 min-h-0 -mx-2 -mb-3">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={data} margin={{ top: 2, right: 0, left: -6, bottom: -10 }}>
+                  <AreaChart data={data} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id={`g-${i}`} x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor={color} stopOpacity={0.45} />
@@ -226,14 +226,10 @@ export function NetworkPanel({ serialNo, online, payload }: { serialNo: string; 
                     <CartesianGrid stroke={GRID_COLOR} strokeDasharray="0" vertical={true} horizontal={true} />
                     <XAxis
                       dataKey="t"
-                      tick={{ fill: "var(--color-muted-foreground)", fontSize: 9 }}
+                      tick={false}
                       tickLine={false}
                       axisLine={{ stroke: GRID_COLOR }}
-                      tickFormatter={(v) => {
-                        const d = new Date(v as number);
-                        return `${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
-                      }}
-                      minTickGap={30}
+                      height={0}
                     />
                     <YAxis
                       width={24}
