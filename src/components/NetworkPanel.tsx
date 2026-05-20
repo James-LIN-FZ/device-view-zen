@@ -213,7 +213,20 @@ export function NetworkPanel({ serialNo, online, payload }: { serialNo: string; 
                         <stop offset="100%" stopColor={color} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid stroke={GRID_COLOR} strokeDasharray="0" vertical={true} horizontal={true} />
+                    <CartesianGrid
+                      stroke={GRID_COLOR}
+                      strokeDasharray="0"
+                      horizontalCoordinatesGenerator={({ yAxis }) => {
+                        const y = yAxis.y as number;
+                        const h = yAxis.height as number;
+                        return [y + h * 0.25, y + h * 0.5, y + h * 0.75];
+                      }}
+                      verticalCoordinatesGenerator={({ xAxis }) => {
+                        const x = xAxis.x as number;
+                        const w = xAxis.width as number;
+                        return [1, 2, 3, 4, 5].map((k) => x + (w * k) / 6);
+                      }}
+                    />
                     <XAxis
                       dataKey="t"
                       tick={false}
