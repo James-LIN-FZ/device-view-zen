@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Network, Settings } from "lucide-react";
+import { Network } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -187,9 +187,9 @@ export function NetworkPanel({ serialNo, online, payload }: { serialNo: string; 
           return (
             <div
               key={`${nic.name}-${i}`}
-              className="rounded-md border border-border bg-card/40 p-3 flex flex-col min-h-0"
+              className="rounded-md border border-border bg-card/40 px-1 py-1 flex flex-col min-h-0"
             >
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-1 px-1">
                 <div className="min-w-0">
                   <div className={`text-xs font-semibold tracking-wide truncate ${isEmpty ? "text-muted-foreground" : ""}`}>
                     {nic.name}
@@ -197,16 +197,6 @@ export function NetworkPanel({ serialNo, online, payload }: { serialNo: string; 
                   <div className={`text-[10px] truncate ${isEmpty ? "text-muted-foreground" : "text-muted-foreground"}`}>{nic.type}</div>
                 </div>
                 <div className="text-right">
-                  <div className="flex justify-end mb-0.5">
-                    <button
-                      type="button"
-                      className="inline-flex items-center justify-center rounded-sm border border-border p-0.5 text-muted-foreground hover:border-primary/50 hover:text-primary transition"
-                      aria-label="网卡设置"
-                      title="网卡设置"
-                    >
-                      <Settings className="h-3 w-3" />
-                    </button>
-                  </div>
                   <div className={`font-mono text-xs tabular-nums ${isEmpty ? "text-muted-foreground" : ""}`} style={isEmpty ? undefined : { color }}>
                     {isEmpty ? "--" : `↑${last.up.toFixed(1)} Kbps`}
                     <span className="text-muted-foreground">/</span>
