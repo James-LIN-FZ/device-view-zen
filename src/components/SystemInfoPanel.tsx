@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,90 +10,198 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { requestDeviceRPC, fetchDeviceRPCReply } from "@/lib/device-api";
 
+async function rpcCall(
+  serialNo: string,
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<{ status: string; data?: unknown } | null> {
+  try {
+    const ack = await requestDeviceRPC(serialNo, { method, path, body });
+    if (!ack?.requestId) return null;
+    const deadline = Date.now() + (ack.timeoutSeconds ?? 10) * 1000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 500));
+      const reply = await fetchDeviceRPCReply(serialNo, ack.requestId);
+      if (reply !== null) return reply;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
-export function SystemInfoPanel() {
+export function SystemInfoPanel({ serialNo, online }: { serialNo: string; online: boolean }) {
+  const mountedRef = useRef(true);
+
   // 系统信息
-  const [deviceName] = useState("EncodeBox-X1");
-  const [model] = useState("v3.2.1");
-  const [serialNumber] = useState("SN20260310001");
-  const [activated, setActivated] = useState(true);
-  const [activationKey, setActivationKey] = useState("XXXX-XXXX-XXXX-XXXX");
+  const [loading, setLoading] = useState(false);
+  const [deviceName, setDeviceName] = useState("");
+  const [model, setModel] = useState("");
+  const [serialNumber, setSerialNumber] = useState("");
+  const [activated, setActivated] = useState(false);
+  const [activationKey, setActivationKey] = useState("");
   const [editingKey, setEditingKey] = useState(false);
   const [showKey, setShowKey] = useState(false);
-  const [pageVersion] = useState("v8.5_20260310");
-  const [iFrpClientId] = useState("10086");
-  const [sFrpServer] = useState("frp.example.com");
-  const [ntpStatus, setNtpStatus] = useState("已同步");
-  const [feature] = useState("Standard");
+  const pageVersion = "v8.5_20260310";
+  const [iFrpClientId, setIFrpClientId] = useState("");
+  const [sFrpServer, setSFrpServer] = useState("");
+  const [ntpStatus, setNtpStatus] = useState("--");
+  const [feature, setFeature] = useState("--");
 
   // 系统操作
   const [controlCmd, setControlCmd] = useState("");
-
 
   // 服务器配置
   const [passwordDialog, setPasswordDialog] = useState(false);
   const [enteredPassword, setEnteredPassword] = useState("");
   const [serverConfigDialog, setServerConfigDialog] = useState(false);
-  const [sserver, setSserver] = useState("agg.example.com");
+  const [sserver, setSserver] = useState("");
   const [skey, setSkey] = useState("");
-  const [sGTHost] = useState("smux.example.com");
-  const [sGTPeer] = useState("PEER-001");
-  const [sFileServer, setSFileServer] = useState("file.example.com");
+  const [sGTHost, setSGTHost] = useState("");
+  const [sGTPeer, setSGTPeer] = useState("");
+  const [sFileServer, setSFileServer] = useState("");
 
   // 修改密码
   const [changePskDialog, setChangePskDialog] = useState(false);
   const [newPsk, setNewPsk] = useState("");
   const [confirmPsk, setConfirmPsk] = useState("");
 
-  const verifyPassword = () => {
-    if (!enteredPassword) {
-      toast.error("请输入密码");
-      return;
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!online) return;
+    void loadInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serialNo, online]);
+
+  async function loadInfo() {
+    if (!mountedRef.current) return;
+    setLoading(true);
+    try {
+      const infoReply = await rpcCall(serialNo, "GET", "/system/deviceinfo");
+      if (!mountedRef.current) return;
+      if (infoReply?.status === "ok" && Array.isArray(infoReply.data)) {
+        const items = infoReply.data as { name: string; value: unknown }[];
+        const get = (n: string) => (items.find((i) => i.name === n)?.value as string) ?? "";
+        setDeviceName(get("deviceName"));
+        setModel(get("model"));
+        setSerialNumber(get("serialNumber"));
+        setActivationKey(get("key"));
+        setIFrpClientId(get("iFrpClientId"));
+        setSFrpServer(get("sFrpServer"));
+        setNtpStatus(get("sNtpStatus") || "--");
+        setFeature(get("sFeature") || "--");
+        setSserver(get("sSSServer"));
+        setSkey(get("sSSKey"));
+        setSGTHost(get("sGTHost"));
+        setSGTPeer(get("sGTPeer"));
+        setSFileServer(get("sFileServer"));
+        setActivated(get("iVerifyResult") === "1");
+      }
+    } finally {
+      if (mountedRef.current) setLoading(false);
     }
-    setPasswordDialog(false);
-    setEnteredPassword("");
-    setServerConfigDialog(true);
+  }
+
+  const confirmActivation = async () => {
+    const reply = await rpcCall(serialNo, "POST", "/system/key", { key: activationKey });
+    if (!mountedRef.current) return;
+    if (reply?.status === "ok") {
+      setEditingKey(false);
+      setActivated(true);
+      toast.success("激活成功");
+    } else {
+      toast.error("激活失败");
+    }
   };
 
-  const confirmServer = () => {
-    setServerConfigDialog(false);
-    toast.success("服务器配置已保存");
-  };
-
-  const confirmActivation = () => {
-    setEditingKey(false);
-    setActivated(true);
-    toast.success("激活成功");
-  };
-
-  const sync = () => {
+  const syncNtp = async () => {
     setNtpStatus("同步中...");
-    setTimeout(() => {
+    const reply = await rpcCall(serialNo, "POST", "/system/ntp");
+    if (!mountedRef.current) return;
+    if (reply?.status === "ok") {
       setNtpStatus("已同步");
       toast.success("NTP 同步完成");
-    }, 800);
+    } else {
+      setNtpStatus("同步失败");
+      toast.error("NTP 同步失败");
+    }
   };
 
-
-  const reboot = () => {
-    if (confirm("确定重启设备?")) toast.success("设备重启指令已发送");
+  const reboot = async () => {
+    if (!confirm("确定重启设备?")) return;
+    const reply = await rpcCall(serialNo, "POST", "/system/reboot");
+    if (reply?.status === "ok") {
+      toast.success("设备重启指令已发送");
+    } else {
+      toast.error("重启指令发送失败");
+    }
   };
 
-  const confirmChangePsk = () => {
-    if (!newPsk || newPsk !== confirmPsk) {
+  const sendControl = async () => {
+    if (!controlCmd) return;
+    const reply = await rpcCall(serialNo, "POST", "/system/control", { cmd: controlCmd });
+    if (reply?.status === "ok") {
+      toast.success("指令已发送");
+    } else {
+      toast.error("指令发送失败");
+    }
+  };
+
+  const verifyPassword = () => {
+    if (enteredPassword === "5g4kpassword") {
+      setPasswordDialog(false);
+      setEnteredPassword("");
+      setServerConfigDialog(true);
+    } else {
+      toast.error("密码错误");
+    }
+  };
+
+  const confirmServer = async () => {
+    const reply = await rpcCall(serialNo, "POST", "/net/ss_server", {
+      sSSServer: sserver,
+      sSSKey: skey,
+      sGTHost,
+      sGTPeer,
+      sFileServer,
+    });
+    if (!mountedRef.current) return;
+    if (reply?.status === "ok") {
+      setServerConfigDialog(false);
+      toast.success("服务器配置已保存");
+    } else {
+      toast.error("保存失败");
+    }
+  };
+
+  const confirmChangePsk = async () => {
+    if (!newPsk || newPsk.length < 6) {
+      toast.error("密码长度不能小于6位");
+      return;
+    }
+    if (newPsk !== confirmPsk) {
       toast.error("两次密码不一致");
       return;
     }
-    setChangePskDialog(false);
-    setNewPsk("");
-    setConfirmPsk("");
-    toast.success("密码已修改");
-  };
-
-  const sendControl = () => {
-    if (!controlCmd) return;
-    toast.success(`指令已发送：${controlCmd}`);
+    const reply = await rpcCall(serialNo, "POST", "/system/psk", { psk: newPsk });
+    if (!mountedRef.current) return;
+    if (reply?.status === "ok") {
+      setChangePskDialog(false);
+      setNewPsk("");
+      setConfirmPsk("");
+      toast.success("密码修改成功");
+    } else {
+      toast.error("修改密码失败");
+    }
   };
 
   return (
@@ -102,22 +210,22 @@ export function SystemInfoPanel() {
       <section>
         <h3 className="text-sm font-medium mb-3">系统信息</h3>
         <div className="border border-border rounded-md px-4 py-3 grid grid-cols-2 gap-x-8 gap-y-2">
-          <Row label="设备型号" value={deviceName} />
-          <Row label="管理账号" value={`${iFrpClientId}@${sFrpServer}`} />
-          <Row label="系统版本" value={model} />
+          <Row label="设备型号" value={loading ? "加载中..." : deviceName} />
+          <Row label="管理账号" value={loading ? "加载中..." : `${iFrpClientId}@${sFrpServer}`} />
+          <Row label="系统版本" value={loading ? "加载中..." : model} />
           <Row
             label="NTP状态"
             value={
               <span className="flex items-center gap-2">
-                {ntpStatus}
-                <Button size="sm" variant="outline" className="h-6 px-2" onClick={sync}>
+                {loading ? "加载中..." : ntpStatus}
+                <Button size="sm" variant="outline" className="h-6 px-2" onClick={syncNtp} disabled={!online}>
                   同步
                 </Button>
               </span>
             }
           />
-          <Row label="序列号" value={serialNumber} />
-          <Row label="特性" value={feature} />
+          <Row label="序列号" value={loading ? "加载中..." : serialNumber} />
+          <Row label="特性" value={loading ? "加载中..." : feature} />
           <Row
             label="激活码"
             value={
@@ -127,8 +235,9 @@ export function SystemInfoPanel() {
                     value={activationKey}
                     onChange={(e) => setActivationKey(e.target.value)}
                     className="h-7 w-48"
+                    disabled={!online}
                   />
-                  <Button size="sm" className="h-7 px-2" onClick={confirmActivation}>
+                  <Button size="sm" className="h-7 px-2" onClick={confirmActivation} disabled={!online}>
                     确认
                   </Button>
                   <Button
@@ -143,7 +252,7 @@ export function SystemInfoPanel() {
               ) : (
                 <span
                   className="flex items-center gap-1 cursor-pointer"
-                  onClick={() => setEditingKey(true)}
+                  onClick={() => online && setEditingKey(true)}
                 >
                   <span>{showKey ? activationKey : "••••-••••-••••-••••"}</span>
                   <button
@@ -169,8 +278,9 @@ export function SystemInfoPanel() {
             label="服务器配置"
             value={
               <button
-                onClick={() => setPasswordDialog(true)}
-                className="text-primary hover:underline"
+                onClick={() => online && setPasswordDialog(true)}
+                disabled={!online}
+                className="text-primary hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 配置
               </button>
@@ -190,22 +300,22 @@ export function SystemInfoPanel() {
               value={controlCmd}
               onChange={(e) => setControlCmd(e.target.value)}
               className="h-8 w-80"
+              disabled={!online}
             />
-            <Button size="sm" onClick={sendControl}>
+            <Button size="sm" onClick={sendControl} disabled={!online}>
               确认
             </Button>
           </div>
           <div className="flex gap-3 pt-1">
-            <Button variant="outline" size="sm" onClick={reboot}>
+            <Button variant="outline" size="sm" onClick={reboot} disabled={!online}>
               重启
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setChangePskDialog(true)}>
+            <Button variant="outline" size="sm" onClick={() => setChangePskDialog(true)} disabled={!online}>
               修改密码
             </Button>
           </div>
         </div>
       </section>
-
 
       {/* ====== 管理员密码 ====== */}
       <Dialog open={passwordDialog} onOpenChange={setPasswordDialog}>
