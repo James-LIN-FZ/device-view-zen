@@ -232,8 +232,8 @@ export function NetworkPanel({ serialNo, online, payload }: { serialNo: string; 
                       height={0}
                     />
                     <YAxis
-                      width={24}
-                      tick={{ fill: "var(--color-muted-foreground)", fontSize: 9 }}
+                      width={0}
+                      tick={false}
                       tickLine={false}
                       axisLine={{ stroke: GRID_COLOR }}
                       domain={[0, "auto"]}
