@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { fetchDeviceRPCReply, requestDeviceRPC } from "@/lib/device-api";
+import { rpcCall } from "@/lib/device-api";
 
 // ── Device API shapes ──────────────────────────────────────────────────────
 
@@ -144,27 +144,6 @@ function statusText(s: number) {
 function formatWifiSpeed(bps: number): string {
   if (bps > 10000) return Math.floor(bps / 1024) + "kbps";
   return bps + "bps";
-}
-
-async function rpcCall(
-  serialNo: string,
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<{ status: string; data?: unknown } | null> {
-  try {
-    const ack = await requestDeviceRPC(serialNo, { method, path, body });
-    if (!ack?.requestId) return null;
-    const deadline = Date.now() + (ack.timeoutSeconds ?? 10) * 1000;
-    while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 500));
-      const reply = await fetchDeviceRPCReply(serialNo, ack.requestId);
-      if (reply?.status !== "pending") return reply;
-    }
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 function parseNetItems(data: unknown): NetItem[] {

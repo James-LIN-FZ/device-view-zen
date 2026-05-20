@@ -1,4 +1,5 @@
 import { getAuthToken } from "@/lib/auth";
+import { subscribeRPCReady } from "@/lib/rpc-events";
 
 export interface BackendDevice {
   id: number;
@@ -284,4 +285,54 @@ export async function fetchDeviceRPCReply(serialNo: string, requestId: string): 
   }
 
   return (await response.json()) as DeviceRPCReply;
+}
+
+/**
+ * Initiate a device RPC call and wait for the reply.
+ *
+ * Flow:
+ *  1. POST HTTP to start the RPC → receive an ack with requestId.
+ *  2. Subscribe to the WS notification for that requestId (fired by
+ *     `notifyRPCReady` in the WebSocket handler when `rpc.reply` arrives).
+ *  3. When the WS fires, immediately fetch the reply via HTTP.
+ *  4. If no WS notification arrives within 5 s, fall back and try HTTP anyway.
+ *  5. Repeat until the total 15 s deadline is exceeded, then return null.
+ */
+export async function rpcCall(
+  serialNo: string,
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<DeviceRPCReply | null> {
+  try {
+    const ack = await requestDeviceRPC(serialNo, { method, path, body });
+    if (!ack?.requestId) return null;
+
+    const TIMEOUT_MS = 15_000;
+    const FALLBACK_POLL_MS = 5_000;
+    const deadline = Date.now() + TIMEOUT_MS;
+
+    let unsubscribe = (): void => {};
+    const wsNotify = new Promise<void>((resolve) => {
+      unsubscribe = subscribeRPCReady(ack.requestId, resolve);
+    });
+
+    try {
+      while (Date.now() < deadline) {
+        const remaining = deadline - Date.now();
+        await Promise.race([
+          wsNotify,
+          new Promise<void>((r) => setTimeout(r, Math.min(FALLBACK_POLL_MS, remaining))),
+        ]);
+        const reply = await fetchDeviceRPCReply(serialNo, ack.requestId);
+        if (reply !== null) return reply;
+      }
+    } finally {
+      unsubscribe();
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }

@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { fetchDeviceRPCReply, requestDeviceRPC } from "@/lib/device-api";
+import { rpcCall } from "@/lib/device-api";
 
 type SipMode = "0" | "1" | "2";
 
@@ -21,29 +21,6 @@ const MODE_OPTIONS: { value: SipMode; label: string }[] = [
   { value: "1", label: "通话" },
   { value: "2", label: "对讲" },
 ];
-
-// ── RPC helper ─────────────────────────────────────────────────────────────
-
-async function rpcCall(
-  serialNo: string,
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<{ status: string; data?: unknown } | null> {
-  try {
-    const ack = await requestDeviceRPC(serialNo, { method, path, body });
-    if (!ack?.requestId) return null;
-    const deadline = Date.now() + (ack.timeoutSeconds ?? 10) * 1000;
-    while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 500));
-      const reply = await fetchDeviceRPCReply(serialNo, ack.requestId);
-      if (reply?.status !== "pending") return reply;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
 
 // ── Call-status shape ──────────────────────────────────────────────────────
 
@@ -149,7 +126,6 @@ export function VoiceCallPanel({
   useEffect(() => {
     mountedRef.current = true;
     isRefreshingRef.current = false;
-    
     void loadAll();
     const timer = setInterval(refreshCall, 3000);
     return () => {

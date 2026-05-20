@@ -18,7 +18,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { fetchDeviceRPCReply, requestDeviceRPC } from "@/lib/device-api";
+import { rpcCall } from "@/lib/device-api";
 
 // ── Device data types ────────────────────────────────────────────────────────
 
@@ -70,38 +70,6 @@ const DEINTERLACE_OPTIONS: { label: string; value: string }[] = [
 const SUB_TEMPLATE_NONE = "__none__";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function waitMs(ms: number): Promise<void> {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Fire a device RPC call and poll until the reply arrives (or timeout).
- * Returns { status, data } on completion, or null on timeout/error.
- */
-async function rpcCall(
-  serialNo: string,
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<{ status: string; data?: unknown } | null> {
-  try {
-    const ack = await requestDeviceRPC(serialNo, { method, path, body });
-    const requestId = (ack.requestId || "").trim();
-    if (!requestId) return null;
-    const deadline = Date.now() + (ack.timeoutSeconds || 15) * 1000;
-    while (Date.now() < deadline) {
-      const reply = await fetchDeviceRPCReply(serialNo, requestId);
-      if (reply && reply.status !== "pending") {
-        return { status: reply.status, data: reply.data };
-      }
-      await waitMs(500);
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
 
 function parseEncodeTasks(data: unknown): DeviceEncodeTask[] {
   if (!Array.isArray(data)) return [];
@@ -212,11 +180,11 @@ export function EncodingTasksPanel({
   const loadTasks = async () => {
     if (!serialNo || !online) {
       setTasks([]);
-      return;
+      return false;
     }
     setLoading(true);
     const result = await rpcCall(serialNo, "GET", "/encode");
-    if (!mountedRef.current) return;
+    if (!mountedRef.current) return false;
     setLoading(false);
     if (result?.status === "ok") {
       setTasks(parseEncodeTasks(result.data));

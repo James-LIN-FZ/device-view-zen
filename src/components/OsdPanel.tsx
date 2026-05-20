@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { fetchDeviceRPCReply, requestDeviceRPC } from "@/lib/device-api";
+import { rpcCall } from "@/lib/device-api";
 
 const OSD_TYPES = [{ label: "文字", value: "text" }];
 
@@ -25,27 +25,6 @@ const OSD_POSITIONS = [
 ];
 
 const OSD_SIZES = [24, 28, 32, 36, 38, 40];
-
-async function rpcCall(
-  serialNo: string,
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<{ status: string; data?: unknown } | null> {
-  try {
-    const ack = await requestDeviceRPC(serialNo, { method, path, body });
-    if (!ack?.requestId) return null;
-    const deadline = Date.now() + (ack.timeoutSeconds ?? 10) * 1000;
-    while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 500));
-      const reply = await fetchDeviceRPCReply(serialNo, ack.requestId);
-      if (reply?.status !== "pending") return reply;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
 
 export function OsdPanel({
   serialNo,

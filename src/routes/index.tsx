@@ -11,6 +11,7 @@ import { SmartStreamView } from "@/components/SmartStreamView";
 import { DeviceConfigView } from "@/components/DeviceConfigView";
 import { getAuthToken, isAuthenticated } from "@/lib/auth";
 import { fetchDeviceNetwork, fetchDeviceStatus, fetchMyDevices, updateDeviceName, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
+import { notifyRPCReady } from "@/lib/rpc-events";
 
 type DeviceWsMessage = {
   type?: string;
@@ -235,7 +236,9 @@ function Dashboard() {
         const msg = JSON.parse(String(event.data)) as DeviceWsMessage;
         if (msg.type === "rpc.reply") {
           if (msg.payload && typeof msg.payload === "object") {
-            setRPCNotice(msg.payload as RPCNoticePayload);
+            const payload = msg.payload as RPCNoticePayload;
+            if (payload.requestId) notifyRPCReady(payload.requestId);
+            setRPCNotice(payload);
           }
           return;
         }
