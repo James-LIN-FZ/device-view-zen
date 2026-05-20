@@ -566,7 +566,7 @@ export function TemplatesPanel({
           <h3 className="text-sm font-medium">{editingTemplate.sName}</h3>
         </div>
 
-        <div className="grid grid-cols-4 items-center gap-x-4 gap-y-3 max-w-4xl">
+        <div className="grid grid-cols-[5rem_1fr_5rem_1fr] items-center gap-x-4 gap-y-3 max-w-4xl">
           {/* ===== 视频部分 ===== */}
           <GLabel>视频编码</GLabel>
           <Sel
