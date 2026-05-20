@@ -438,6 +438,7 @@ function formToBody(form: EditForm): Record<string, unknown> {
     iMainVBitrate,
     iMainVFps,
     iMainVGop: form.gop,
+    iMainVGOP: form.gop,
     iOsd: form.osd ? 1 : 0,
     sMainACodec: form.audioCodec.toLowerCase(),
     iMainAChannels: parseInt(form.channels),
