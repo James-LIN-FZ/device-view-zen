@@ -244,7 +244,6 @@ export function NetworkSettingsPanel({
   online: boolean;
 }) {
   const mountedRef = useRef(true);
-  const isRefreshingRef = useRef(false);
 
   const [status, setStatus] = useState<PanelLoadStatus>("loading");
   const [eths, setEths] = useState<EthernetIf[]>([]);
@@ -268,7 +267,7 @@ export function NetworkSettingsPanel({
 
   // ── Data loading ───────────────────────────────────────────────────────────
 
-  function applyNetItems(items: NetItem[], full: boolean) {
+  function applyNetItems(items: NetItem[]) {
     let totalTx = 0,
       totalRx = 0,
       wTx = 0,
@@ -293,27 +292,9 @@ export function NetworkSettingsPanel({
     setWifiUp(formatWifiSpeed(wTx));
     setWifiDown(formatWifiSpeed(wRx));
 
-    if (full) {
-      setEths(newEths);
-      setModems(newModems);
-      if (newEths.length > 0) setOpenEth(newEths[0].name);
-    } else {
-      // Only refresh live fields; keep editable fields as-is
-      setEths((prev) =>
-        prev.map((e) => {
-          const f = newEths.find((n) => n.name === e.name);
-          if (!f) return e;
-          return { ...e, up: f.up, down: f.down, ip: f.ip, gateway: f.gateway, status: f.status };
-        }),
-      );
-      setModems((prev) =>
-        prev.map((m) => {
-          const f = newModems.find((n) => n.interfaceName === m.interfaceName);
-          if (!f) return m;
-          return { ...m, tx: f.tx, rx: f.rx, status: f.status, ipv4: f.ipv4 };
-        }),
-      );
-    }
+    setEths(newEths);
+    setModems(newModems);
+    if (newEths.length > 0) setOpenEth(newEths[0].name);
   }
 
   async function loadAll() {
@@ -332,7 +313,7 @@ export function NetworkSettingsPanel({
       setStatus("error");
       return;
     }
-    applyNetItems(parseNetItems(netReply.data), true);
+    applyNetItems(parseNetItems(netReply.data));
     if (aggReply?.status === "ok") {
       const d = aggReply.data as Record<string, unknown>;
       setAggEnabled(d?.iPower === 1);
@@ -344,28 +325,11 @@ export function NetworkSettingsPanel({
     setStatus("ready");
   }
 
-  async function refreshSpeeds() {
-    if (!online || !mountedRef.current || isRefreshingRef.current) return;
-    isRefreshingRef.current = true;
-    try {
-      const reply = await rpcCall(serialNo, "GET", "/net");
-      if (!mountedRef.current) return;
-      if (reply?.status === "ok") applyNetItems(parseNetItems(reply.data), false);
-    } finally {
-      isRefreshingRef.current = false;
-    }
-  }
-
   useEffect(() => {
     mountedRef.current = true;
-    isRefreshingRef.current = false;
-    loadAll();
-    const timer = setInterval(() => {
-      refreshSpeeds();
-    }, 2000);
+    void loadAll();
     return () => {
       mountedRef.current = false;
-      clearInterval(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serialNo, online]);
@@ -387,8 +351,10 @@ export function NetworkSettingsPanel({
     const result = await rpcCall(serialNo, "POST", `/net/${e.name}`, body);
     if (!mountedRef.current) return;
     setSaving(null);
-    if (result?.status === "ok") toast.success(`${e.name} 已修改`);
-    else toast.error(`${e.name} 修改失败`);
+    if (result?.status === "ok") {
+      toast.success(`${e.name} 已修改`);
+      void loadAll();
+    } else toast.error(`${e.name} 修改失败`);
   }
 
   async function saveModem(m: ModemIf) {
@@ -417,8 +383,10 @@ export function NetworkSettingsPanel({
     const result = await rpcCall(serialNo, "POST", `/net/${m.interfaceName}`, body);
     if (!mountedRef.current) return;
     setSaving(null);
-    if (result?.status === "ok") toast.success(`${m.interfaceName} 已修改`);
-    else toast.error(`${m.interfaceName} 修改失败`);
+    if (result?.status === "ok") {
+      toast.success(`${m.interfaceName} 已修改`);
+      void loadAll();
+    } else toast.error(`${m.interfaceName} 修改失败`);
   }
 
   async function toggleAgg(enabled: boolean) {
