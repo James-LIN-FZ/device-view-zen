@@ -99,7 +99,7 @@ export function DeviceConfigView({
             ) : active === "template" ? (
               <TemplatesPanel serialNo={device.serialNo} online={device.online} />
             ) : active === "osd" ? (
-              <OsdPanel />
+              <OsdPanel serialNo={device.serialNo} online={device.online} />
             ) : active === "network" ? (
               <NetworkSettingsPanel serialNo={device.serialNo} online={device.online} />
             ) : active === "voice" ? (
