@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { PanelStatusView, type PanelLoadStatus } from "@/components/PanelStatus";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,7 +55,7 @@ export function OsdPanel({
   online: boolean;
 }) {
   const mountedRef = useRef(true);
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<PanelLoadStatus>("loading");
   const [saving, setSaving] = useState(false);
   const [osdType, setOsdType] = useState("text");
   const [position, setPosition] = useState("bottom_middle");
@@ -64,8 +65,7 @@ export function OsdPanel({
 
   useEffect(() => {
     mountedRef.current = true;
-    setLoading(true);
-    loadOsd();
+    void loadOsd();
     return () => {
       mountedRef.current = false;
     };
@@ -73,8 +73,9 @@ export function OsdPanel({
   }, [serialNo, online]);
 
   async function loadOsd() {
+    setStatus("loading");
     if (!online) {
-      setLoading(false);
+      setStatus("error");
       return;
     }
     const reply = await rpcCall(serialNo, "GET", "/osd");
@@ -86,8 +87,10 @@ export function OsdPanel({
       setSize(Number(d.iFontSize ?? 32));
       setColor(String(d.sFontColor ?? "#ffffff"));
       setText(String(d.sText ?? ""));
+      setStatus("ready");
+    } else {
+      setStatus("error");
     }
-    setLoading(false);
   }
 
   async function handleConfirm() {
@@ -110,13 +113,8 @@ export function OsdPanel({
     else toast.error("保存失败");
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center gap-2 py-8 text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        <span className="text-sm">加载中…</span>
-      </div>
-    );
+  if (status !== "ready") {
+    return <PanelStatusView status={status} onRetry={() => void loadOsd()} />;
   }
 
   return (
