@@ -66,7 +66,7 @@ export function PanelStatusView({
   onRetry: () => void;
   loadingLabel?: string;
   errorLabel?: string;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   if (status === "loading") {
     return (
