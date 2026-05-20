@@ -95,9 +95,9 @@ export function DeviceConfigView({
           {/* Right panel */}
           <div className="flex-1 min-w-0 overflow-y-auto px-4 py-3">
             {active === "encoding" ? (
-              <EncodingTasksPanel />
+              <EncodingTasksPanel serialNo={device.serialNo} online={device.online} />
             ) : active === "template" ? (
-              <TemplatesPanel />
+              <TemplatesPanel serialNo={device.serialNo} online={device.online} />
             ) : active === "osd" ? (
               <OsdPanel />
             ) : active === "network" ? (
