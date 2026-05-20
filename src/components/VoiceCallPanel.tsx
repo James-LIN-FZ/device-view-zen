@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Phone, Smartphone, Mic, Loader2 } from "lucide-react";
+import { PanelStatusView, type PanelLoadStatus } from "@/components/PanelStatus";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,7 +76,7 @@ export function VoiceCallPanel({
   const isRefreshingRef = useRef(false);
   const startedRef = useRef(false);
 
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<PanelLoadStatus>("loading");
   const [saving, setSaving] = useState(false);
   const [isTalking, setIsTalking] = useState(false);
 
@@ -92,8 +93,9 @@ export function VoiceCallPanel({
   // ── Load ─────────────────────────────────────────────────────────────────
 
   async function loadAll() {
+    setStatus("loading");
     if (!online) {
-      setLoading(false);
+      setStatus("error");
       return;
     }
     const [infoReply, callReply] = await Promise.all([
@@ -102,21 +104,23 @@ export function VoiceCallPanel({
     ]);
     if (!mountedRef.current) return;
 
-    if (infoReply?.status === "ok" && Array.isArray(infoReply.data)) {
-      for (const item of infoReply.data as { name: string; value: unknown }[]) {
-        if (item.name === "sSipMode") setMode(String(item.value) as SipMode);
-        if (item.name === "sSipUri") setUri(String(item.value ?? ""));
-        if (item.name === "sSipUsername") setUsername(String(item.value ?? ""));
-        if (item.name === "sSipPassword") setPassword(String(item.value ?? ""));
-        if (item.name === "sSipCall") setSipCall(String(item.value ?? ""));
-      }
+    if (infoReply?.status !== "ok" || !Array.isArray(infoReply.data)) {
+      setStatus("error");
+      return;
+    }
+    for (const item of infoReply.data as { name: string; value: unknown }[]) {
+      if (item.name === "sSipMode") setMode(String(item.value) as SipMode);
+      if (item.name === "sSipUri") setUri(String(item.value ?? ""));
+      if (item.name === "sSipUsername") setUsername(String(item.value ?? ""));
+      if (item.name === "sSipPassword") setPassword(String(item.value ?? ""));
+      if (item.name === "sSipCall") setSipCall(String(item.value ?? ""));
     }
 
     if (callReply?.status === "ok" && callReply.data) {
       applyCallStatus(callReply.data);
     }
 
-    setLoading(false);
+    setStatus("ready");
   }
 
   function applyCallStatus(data: unknown) {
@@ -146,7 +150,7 @@ export function VoiceCallPanel({
     mountedRef.current = true;
     isRefreshingRef.current = false;
     setLoading(true);
-    loadAll();
+    void loadAll();
     const timer = setInterval(refreshCall, 3000);
     return () => {
       mountedRef.current = false;
