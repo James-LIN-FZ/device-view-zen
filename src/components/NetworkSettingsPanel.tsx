@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   ArrowUp,
@@ -7,6 +7,7 @@ import {
   Wifi,
   Signal,
   Network as NetworkIcon,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,150 +22,109 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { fetchDeviceRPCReply, requestDeviceRPC } from "@/lib/device-api";
+
+// ── Device API shapes ──────────────────────────────────────────────────────
+
+interface NetItemLink {
+  sType: string;
+  sInterface: string;
+  sAddress: string;
+  sDNS1: string;
+  sDNS2: string;
+  iDuplex: number;
+  iAutoConnect: number;
+  sSN?: string;
+  sNicSpeed?: string;
+  sExt?: string;
+}
+
+interface NetItemIpv4 {
+  sV4Address: string;
+  sV4Gateway: string;
+  sV4Method: string; // "dhcp"/"manual" for eth; JSON for wlan
+  sV4Netmask: string;
+  iOrder: number;
+}
+
+interface NetItemStats {
+  iTxSpeed: number;
+  iRxSpeed: number;
+  sTxSpeed: string;
+  sRxSpeed: string;
+}
+
+interface NetItemModem {
+  sISP?: string;
+  sMode?: string;
+  sModel?: string;
+  sName?: string;
+  iStatus?: number;
+  sSignal?: string;
+  iBand?: string | number;
+  sCellId?: string;
+  sImsi?: string;
+}
+
+interface NetItem {
+  link: NetItemLink;
+  ipv4: NetItemIpv4;
+  statistics: NetItemStats;
+  modem?: NetItemModem;
+}
+
+// ── UI shapes ──────────────────────────────────────────────────────────────
 
 type AddressMode = "manual" | "dhcp";
 
 interface EthernetIf {
-  name: string; // eth0
+  name: string;
+  // live (updated by refresh)
   up: string;
   down: string;
   ip: string;
   gateway: string;
+  status: string;
+  // static info
   mac: string;
-  status: string; // 已连接/未连接
+  // editable
   mode: AddressMode;
+  ipInput: string;
+  gwInput: string;
   netmask: string;
   dns1: string;
   dns2: string;
   routePriority: number;
 }
 
-interface Modem {
-  id: string;
-  name: string; // wlan0 / wwan0 / wwan1
-  interfaceName: string; // 例如 wwan0
-  isp: string;
-  mode: string;
+interface ModemIf {
+  interfaceName: string;
+  sn: string;
+  // live
   tx: string;
   rx: string;
+  status: number;
+  ipv4: string;
+  // static info
+  isp: string;
+  mode: string;
   model: string;
   imei: string;
-  status: 0 | 1 | 2;
   imsi: string;
   signal: string;
   band: string;
   cellId: string;
-  ipv4: string;
   // editable
   autoConnect: boolean;
-  nicMode: string; // 制式
-  ext: string; // 指令
+  nicMode: string;
+  ext: string;
   routePriority: number;
-  // wlan only
-  wifiMode?: string; // close/client/ap
-  wifiSsid?: string;
-  wifiPsk?: string;
+  wifiMode: string;
+  wifiSsid: string;
+  wifiPsk: string;
 }
 
-const DEFAULT_ETH: EthernetIf[] = [
-  {
-    name: "eth0",
-    up: "0bps",
-    down: "0bps",
-    ip: "192.168.3.187",
-    gateway: "192.168.3.1",
-    mac: "AA:BB:CC:11:22:33",
-    status: "已连接",
-    mode: "dhcp",
-    netmask: "255.255.255.0",
-    dns1: "192.168.3.1",
-    dns2: "8.8.8.8",
-    routePriority: 1,
-  },
-  {
-    name: "eth1",
-    up: "0bps",
-    down: "0bps",
-    ip: "10.0.0.12",
-    gateway: "10.0.0.1",
-    mac: "AA:BB:CC:11:22:34",
-    status: "未连接",
-    mode: "manual",
-    netmask: "255.255.255.0",
-    dns1: "8.8.8.8",
-    dns2: "",
-    routePriority: 2,
-  },
-];
-
-const DEFAULT_MODEMS: Modem[] = [
-  {
-    id: "m0",
-    name: "wlan0",
-    interfaceName: "wlan0",
-    isp: "-  -",
-    mode: "client",
-    tx: "0bps",
-    rx: "0bps",
-    model: "MT7921",
-    imei: "-  -",
-    status: 2,
-    imsi: "-  -",
-    signal: "-65dBm",
-    band: "5GHz",
-    cellId: "150Mbps",
-    ipv4: "192.168.1.23",
-    autoConnect: true,
-    nicMode: "",
-    ext: "",
-    routePriority: 3,
-    wifiMode: "client",
-    wifiSsid: "MyWiFi",
-    wifiPsk: "",
-  },
-  {
-    id: "m1",
-    name: "wwan0",
-    interfaceName: "wwan0",
-    isp: "中国移动",
-    mode: "5G",
-    tx: "0bps",
-    rx: "0bps",
-    model: "RM500U",
-    imei: "860000000000001",
-    status: 2,
-    imsi: "460000000000001",
-    signal: "-72dBm",
-    band: "n78",
-    cellId: "0x12345",
-    ipv4: "10.151.32.18",
-    autoConnect: true,
-    nicMode: "",
-    ext: "",
-    routePriority: 4,
-  },
-  {
-    id: "m2",
-    name: "wwan1",
-    interfaceName: "wwan1",
-    isp: "中国联通",
-    mode: "LTE",
-    tx: "0bps",
-    rx: "0bps",
-    model: "EC20",
-    imei: "860000000000002",
-    status: 1,
-    imsi: "460010000000001",
-    signal: "-80dBm",
-    band: "B3",
-    cellId: "0x23456",
-    ipv4: "10.45.12.7",
-    autoConnect: false,
-    nicMode: "LTE+NR",
-    ext: "",
-    routePriority: 5,
-  },
-];
+// ── Constants ──────────────────────────────────────────────────────────────
 
 const ADDRESS_OPTIONS = [
   { label: "手动", value: "manual" },
@@ -174,29 +134,308 @@ const ADDRESS_OPTIONS = [
 const BAND_OPTIONS = ["LTE+NR", "NR_ONLY", "LTE_ONLY", "NR_79"];
 const WIFI_MODE_OPTIONS = ["close", "client", "ap"];
 
-function statusText(s: 0 | 1 | 2) {
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function statusText(s: number) {
   return s === 2 ? "已连接" : s === 1 ? "拨号中" : "未连接";
 }
 
-export function NetworkSettingsPanel() {
-  const [eths, setEths] = useState<EthernetIf[]>(DEFAULT_ETH);
-  const [modems, setModems] = useState<Modem[]>(DEFAULT_MODEMS);
-  const [gwEnabled, setGwEnabled] = useState(false);
-  const [aggEnabled, setAggEnabled] = useState(true);
-  const [openEth, setOpenEth] = useState<string | null>("eth0");
-  const [openModem, setOpenModem] = useState<string | null>("m0");
-  const [wifiOpen, setWifiOpen] = useState(false);
+function formatWifiSpeed(bps: number): string {
+  if (bps > 10000) return Math.floor(bps / 1024) + "kbps";
+  return bps + "bps";
+}
 
-  const upMbps = "0.0";
-  const downMbps = "0.0";
-  const wifiUp = "0bps";
-  const wifiDown = "0bps";
+async function rpcCall(
+  serialNo: string,
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<{ status: string; data?: unknown } | null> {
+  try {
+    const ack = await requestDeviceRPC(serialNo, { method, path, body });
+    if (!ack?.requestId) return null;
+    const deadline = Date.now() + (ack.timeoutSeconds ?? 10) * 1000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 500));
+      const reply = await fetchDeviceRPCReply(serialNo, ack.requestId);
+      if (reply?.status !== "pending") return reply;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function parseNetItems(data: unknown): NetItem[] {
+  if (!Array.isArray(data)) return [];
+  return data.filter(
+    (x): x is NetItem =>
+      x != null && typeof x === "object" && "link" in x && "ipv4" in x && "statistics" in x,
+  );
+}
+
+function toEth(item: NetItem): EthernetIf {
+  const isManual = item.ipv4.sV4Method !== "dhcp";
+  return {
+    name: item.link.sInterface,
+    up: item.statistics.sTxSpeed,
+    down: item.statistics.sRxSpeed,
+    ip: item.ipv4.sV4Address,
+    gateway: item.ipv4.sV4Gateway,
+    status: item.link.iDuplex === 1 ? "已连接" : "未连接",
+    mac: item.link.sAddress ?? "",
+    mode: isManual ? "manual" : "dhcp",
+    ipInput: item.ipv4.sV4Address,
+    gwInput: item.ipv4.sV4Gateway,
+    netmask: item.ipv4.sV4Netmask,
+    dns1: item.link.sDNS1 ?? "",
+    dns2: item.link.sDNS2 ?? "",
+    routePriority: item.ipv4.iOrder ?? 1,
+  };
+}
+
+function toModem(item: NetItem): ModemIf {
+  let wifiMode = "close",
+    wifiSsid = "",
+    wifiPsk = "";
+  try {
+    const parsed = JSON.parse(item.ipv4.sV4Method ?? "{}") as Record<string, unknown>;
+    if (parsed && typeof parsed === "object") {
+      wifiMode = String(parsed.sMethod ?? "close");
+      wifiSsid = String(parsed.sSsid ?? "");
+      wifiPsk = String(parsed.sPassword ?? "");
+    }
+  } catch {
+    /* not JSON — plain method like "dhcp" */
+  }
+  return {
+    interfaceName: item.link.sInterface,
+    sn: item.link.sSN ?? "",
+    tx: item.statistics.sTxSpeed,
+    rx: item.statistics.sRxSpeed,
+    status: item.modem?.iStatus ?? 0,
+    ipv4: item.ipv4.sV4Address,
+    isp: item.modem?.sISP ?? "",
+    mode: item.modem?.sMode ?? "",
+    model: item.modem?.sModel ?? "",
+    imei: item.modem?.sName ?? "",
+    imsi: item.modem?.sImsi ?? "",
+    signal: item.modem?.sSignal ?? "",
+    band: String(item.modem?.iBand ?? ""),
+    cellId: item.modem?.sCellId ?? "",
+    autoConnect: item.link.iAutoConnect === 1,
+    nicMode: item.link.sNicSpeed ?? "",
+    ext: item.link.sExt ?? "",
+    routePriority: item.ipv4.iOrder ?? 1,
+    wifiMode,
+    wifiSsid,
+    wifiPsk,
+  };
+}
+
+// ── Component ──────────────────────────────────────────────────────────────
+
+export function NetworkSettingsPanel({
+  serialNo,
+  online,
+}: {
+  serialNo: string;
+  online: boolean;
+}) {
+  const mountedRef = useRef(true);
+  const isRefreshingRef = useRef(false);
+
+  const [loading, setLoading] = useState(true);
+  const [eths, setEths] = useState<EthernetIf[]>([]);
+  const [modems, setModems] = useState<ModemIf[]>([]);
+  const [gwEnabled, setGwEnabled] = useState(false);
+  const [aggEnabled, setAggEnabled] = useState(false);
+  const [upMbps, setUpMbps] = useState("0.0");
+  const [downMbps, setDownMbps] = useState("0.0");
+  const [wifiUp, setWifiUp] = useState("0bps");
+  const [wifiDown, setWifiDown] = useState("0bps");
+  const [openEth, setOpenEth] = useState<string | null>(null);
+  const [openModem, setOpenModem] = useState<string | null>(null);
+  const [wifiOpen, setWifiOpen] = useState(false);
+  const [saving, setSaving] = useState<string | null>(null);
 
   const patchEth = (name: string, p: Partial<EthernetIf>) =>
     setEths((prev) => prev.map((e) => (e.name === name ? { ...e, ...p } : e)));
 
-  const patchModem = (id: string, p: Partial<Modem>) =>
-    setModems((prev) => prev.map((m) => (m.id === id ? { ...m, ...p } : m)));
+  const patchModem = (iface: string, p: Partial<ModemIf>) =>
+    setModems((prev) => prev.map((m) => (m.interfaceName === iface ? { ...m, ...p } : m)));
+
+  // ── Data loading ───────────────────────────────────────────────────────────
+
+  function applyNetItems(items: NetItem[], full: boolean) {
+    let totalTx = 0,
+      totalRx = 0,
+      wTx = 0,
+      wRx = 0;
+    const newEths: EthernetIf[] = [];
+    const newModems: ModemIf[] = [];
+
+    for (const item of items) {
+      totalTx += item.statistics.iTxSpeed;
+      totalRx += item.statistics.iRxSpeed;
+      if (item.link.sType === "ethernet") {
+        newEths.push(toEth(item));
+      } else {
+        wTx += item.statistics.iTxSpeed;
+        wRx += item.statistics.iRxSpeed;
+        newModems.push(toModem(item));
+      }
+    }
+
+    setUpMbps((totalTx / 1_000_000).toFixed(1));
+    setDownMbps((totalRx / 1_000_000).toFixed(1));
+    setWifiUp(formatWifiSpeed(wTx));
+    setWifiDown(formatWifiSpeed(wRx));
+
+    if (full) {
+      setEths(newEths);
+      setModems(newModems);
+      if (newEths.length > 0) setOpenEth(newEths[0].name);
+    } else {
+      // Only refresh live fields; keep editable fields as-is
+      setEths((prev) =>
+        prev.map((e) => {
+          const f = newEths.find((n) => n.name === e.name);
+          if (!f) return e;
+          return { ...e, up: f.up, down: f.down, ip: f.ip, gateway: f.gateway, status: f.status };
+        }),
+      );
+      setModems((prev) =>
+        prev.map((m) => {
+          const f = newModems.find((n) => n.interfaceName === m.interfaceName);
+          if (!f) return m;
+          return { ...m, tx: f.tx, rx: f.rx, status: f.status, ipv4: f.ipv4 };
+        }),
+      );
+    }
+  }
+
+  async function loadAll() {
+    if (!online) {
+      setLoading(false);
+      return;
+    }
+    const [netReply, aggReply, gwReply] = await Promise.all([
+      rpcCall(serialNo, "GET", "/net"),
+      rpcCall(serialNo, "GET", "/net/aggregation"),
+      rpcCall(serialNo, "GET", "/net/gw"),
+    ]);
+    if (!mountedRef.current) return;
+    if (netReply?.status === "ok") applyNetItems(parseNetItems(netReply.data), true);
+    if (aggReply?.status === "ok") {
+      const d = aggReply.data as Record<string, unknown>;
+      setAggEnabled(d?.iPower === 1);
+    }
+    if (gwReply?.status === "ok") {
+      const d = gwReply.data as Record<string, unknown>;
+      setGwEnabled(d?.iPower === 1);
+    }
+    setLoading(false);
+  }
+
+  async function refreshSpeeds() {
+    if (!online || !mountedRef.current || isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
+    try {
+      const reply = await rpcCall(serialNo, "GET", "/net");
+      if (!mountedRef.current) return;
+      if (reply?.status === "ok") applyNetItems(parseNetItems(reply.data), false);
+    } finally {
+      isRefreshingRef.current = false;
+    }
+  }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    isRefreshingRef.current = false;
+    setLoading(true);
+    loadAll();
+    const timer = setInterval(() => {
+      refreshSpeeds();
+    }, 2000);
+    return () => {
+      mountedRef.current = false;
+      clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serialNo, online]);
+
+  // ── Save handlers ──────────────────────────────────────────────────────────
+
+  async function saveEth(e: EthernetIf) {
+    setSaving(e.name);
+    const body: Record<string, unknown> = {
+      ipv4: {
+        sV4Address: e.ipInput,
+        sV4Gateway: e.gwInput,
+        sV4Method: e.mode,
+        sV4Netmask: e.netmask,
+        iOrder: e.routePriority,
+      },
+      link: { sDNS1: e.dns1, sDNS2: e.dns2 },
+    };
+    const result = await rpcCall(serialNo, "POST", `/net/${e.name}`, body);
+    if (!mountedRef.current) return;
+    setSaving(null);
+    if (result?.status === "ok") toast.success(`${e.name} 已修改`);
+    else toast.error(`${e.name} 修改失败`);
+  }
+
+  async function saveModem(m: ModemIf) {
+    setSaving(m.interfaceName);
+    const isWlan = m.interfaceName === "wlan0";
+    const body: Record<string, unknown> = {
+      link: {
+        iAutoConnect: m.autoConnect ? 1 : 0,
+        sSN: m.sn,
+        sNicSpeed: m.nicMode,
+        sExt: m.ext,
+      },
+      ipv4: {
+        iOrder: m.routePriority,
+        ...(isWlan
+          ? {
+              sV4Method: JSON.stringify({
+                sMethod: m.wifiMode,
+                sPassword: m.wifiPsk,
+                sSsid: m.wifiSsid,
+              }),
+            }
+          : {}),
+      },
+    };
+    const result = await rpcCall(serialNo, "POST", `/net/${m.interfaceName}`, body);
+    if (!mountedRef.current) return;
+    setSaving(null);
+    if (result?.status === "ok") toast.success(`${m.interfaceName} 已修改`);
+    else toast.error(`${m.interfaceName} 修改失败`);
+  }
+
+  async function toggleAgg(enabled: boolean) {
+    setAggEnabled(enabled);
+    await rpcCall(serialNo, "POST", "/net/aggregation", { iPower: enabled ? 1 : 0 });
+  }
+
+  async function toggleGw(enabled: boolean) {
+    setGwEnabled(enabled);
+    await rpcCall(serialNo, "POST", "/net/gw", { iPower: enabled ? 1 : 0 });
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 py-8 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span className="text-sm">加载中…</span>
+      </div>
+    );
+  }
 
   return (
     <div className="-mt-2 -ml-2">
@@ -209,15 +448,18 @@ export function NetworkSettingsPanel() {
           <span className="text-sm">聚合网络:</span>
         </div>
         <Stat icon={<ArrowUp className="h-3.5 w-3.5 text-green-400" />} text={`${upMbps}Mbps`} />
-        <Stat icon={<ArrowDown className="h-3.5 w-3.5 text-blue-400" />} text={`${downMbps}Mbps`} />
+        <Stat
+          icon={<ArrowDown className="h-3.5 w-3.5 text-blue-400" />}
+          text={`${downMbps}Mbps`}
+        />
         <div className="ml-auto flex items-center gap-6">
           <div className="flex items-center gap-2">
             <span className="text-sm">超级网关：</span>
-            <Switch checked={gwEnabled} onCheckedChange={setGwEnabled} />
+            <Switch checked={gwEnabled} onCheckedChange={toggleGw} disabled={!online} />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm">聚合：</span>
-            <Switch checked={aggEnabled} onCheckedChange={setAggEnabled} />
+            <Switch checked={aggEnabled} onCheckedChange={toggleAgg} disabled={!online} />
           </div>
         </div>
       </div>
@@ -239,17 +481,18 @@ export function NetworkSettingsPanel() {
                 </div>
                 <Stat icon={<ArrowUp className="h-3.5 w-3.5 text-green-400" />} text={e.up} />
                 <Stat icon={<ArrowDown className="h-3.5 w-3.5 text-blue-400" />} text={e.down} />
-                <span className="text-xs text-muted-foreground">IP: {e.ip}</span>
-                <span className="text-xs text-muted-foreground">Gateway: {e.gateway}</span>
+                <span className="text-xs text-muted-foreground">IP: {e.ip || "--"}</span>
+                <span className="text-xs text-muted-foreground">Gateway: {e.gateway || "--"}</span>
                 <ChevronDown
                   className={cn("h-4 w-4 ml-auto transition-transform", isOpen && "rotate-180")}
                 />
               </button>
+
               {isOpen && (
                 <div className="px-4 py-3 space-y-3">
                   <Grid>
                     <Field label="接口">{e.name}</Field>
-                    <Field label="MAC">{e.mac}</Field>
+                    <Field label="MAC">{e.mac || "--"}</Field>
                     <Field label="状态">{e.status}</Field>
                     <Field label="类型">WAN/ETH</Field>
                   </Grid>
@@ -260,6 +503,7 @@ export function NetworkSettingsPanel() {
                         <Select
                           value={e.mode}
                           onValueChange={(v) => patchEth(e.name, { mode: v as AddressMode })}
+                          disabled={!online}
                         >
                           <SelectTrigger className="h-8">
                             <SelectValue />
@@ -278,16 +522,18 @@ export function NetworkSettingsPanel() {
                       <>
                         <Field label="IP地址">
                           <Input
-                            value={e.ip}
-                            onChange={(ev) => patchEth(e.name, { ip: ev.target.value })}
+                            value={e.ipInput}
+                            onChange={(ev) => patchEth(e.name, { ipInput: ev.target.value })}
                             className="h-8 w-32"
+                            disabled={!online}
                           />
                         </Field>
                         <Field label="网关">
                           <Input
-                            value={e.gateway}
-                            onChange={(ev) => patchEth(e.name, { gateway: ev.target.value })}
+                            value={e.gwInput}
+                            onChange={(ev) => patchEth(e.name, { gwInput: ev.target.value })}
                             className="h-8 w-32"
+                            disabled={!online}
                           />
                         </Field>
                         <Field label="子网掩码">
@@ -295,6 +541,7 @@ export function NetworkSettingsPanel() {
                             value={e.netmask}
                             onChange={(ev) => patchEth(e.name, { netmask: ev.target.value })}
                             className="h-8 w-32"
+                            disabled={!online}
                           />
                         </Field>
                       </>
@@ -307,6 +554,7 @@ export function NetworkSettingsPanel() {
                         value={e.dns1}
                         onChange={(ev) => patchEth(e.name, { dns1: ev.target.value })}
                         className="h-8 w-32"
+                        disabled={!online}
                       />
                     </Field>
                     <Field label="DNS2">
@@ -314,6 +562,7 @@ export function NetworkSettingsPanel() {
                         value={e.dns2}
                         onChange={(ev) => patchEth(e.name, { dns2: ev.target.value })}
                         className="h-8 w-32"
+                        disabled={!online}
                       />
                     </Field>
                     <Field label="路由优先级">
@@ -326,10 +575,18 @@ export function NetworkSettingsPanel() {
                           patchEth(e.name, { routePriority: Number(ev.target.value) })
                         }
                         className="h-8 w-20"
+                        disabled={!online}
                       />
                     </Field>
                     <div className="flex items-end">
-                      <Button size="sm" onClick={() => toast.success(`${e.name} 已修改`)}>
+                      <Button
+                        size="sm"
+                        onClick={() => saveEth(e)}
+                        disabled={!online || saving === e.name}
+                      >
+                        {saving === e.name && (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                        )}
                         修改
                       </Button>
                     </div>
@@ -361,48 +618,51 @@ export function NetworkSettingsPanel() {
 
         {/* ====== 各 modem / wlan ====== */}
         {modems.map((m, idx) => {
-          const isOpen = openModem === m.id;
+          const isOpen = openModem === m.interfaceName;
+          const isWlan = m.interfaceName === "wlan0";
+          const isWwan0 = m.interfaceName === "wwan0";
           return (
-            <div key={m.id} className="border border-border rounded-md overflow-hidden">
+            <div key={m.interfaceName} className="border border-border rounded-md overflow-hidden">
               <button
                 type="button"
-                onClick={() => setOpenModem(isOpen ? null : m.id)}
+                onClick={() => setOpenModem(isOpen ? null : m.interfaceName)}
                 className="w-full flex items-center gap-4 px-3 py-2.5 bg-muted/20 hover:bg-muted/40 text-left"
               >
                 <span className="text-xs text-muted-foreground w-5 text-center">{idx + 1}</span>
-                <span className="text-sm min-w-20">{m.name}:</span>
+                <span className="text-sm min-w-20">{m.interfaceName}:</span>
                 <Signal className="h-4 w-4 text-primary" />
-                <span className="text-xs text-muted-foreground min-w-20">{m.isp}</span>
-                <span className="text-xs text-muted-foreground min-w-16">{m.mode}</span>
+                <span className="text-xs text-muted-foreground min-w-20">{m.isp || "--"}</span>
+                <span className="text-xs text-muted-foreground min-w-16">{m.mode || "--"}</span>
                 <Stat icon={<ArrowUp className="h-3.5 w-3.5 text-green-400" />} text={m.tx} />
                 <Stat icon={<ArrowDown className="h-3.5 w-3.5 text-blue-400" />} text={m.rx} />
                 <ChevronDown
                   className={cn("h-4 w-4 ml-auto transition-transform", isOpen && "rotate-180")}
                 />
               </button>
+
               {isOpen && (
                 <div className="px-4 py-3 space-y-3">
                   <Grid>
-                    <Field label="模块型号">{m.model}</Field>
-                    <Field label="IMEI">{m.imei}</Field>
+                    <Field label="模块型号">{m.model || "--"}</Field>
+                    <Field label="IMEI">{m.imei || "--"}</Field>
                     <Field label="状态">{statusText(m.status)}</Field>
-                    <Field label="IMSI">{m.imsi}</Field>
+                    <Field label="IMSI">{m.imsi || "--"}</Field>
                   </Grid>
                   <Grid>
-                    <Field label="信号强度">{m.signal}</Field>
-                    <Field label="Band">{m.band}</Field>
-                    <Field label={m.name === "wlan0" ? "Speed" : "CellID"}>{m.cellId}</Field>
-                    <Field label="IP">{m.ipv4}</Field>
+                    <Field label="信号强度">{m.signal || "--"}</Field>
+                    <Field label="Band">{m.band || "--"}</Field>
+                    <Field label={isWlan ? "Speed" : "CellID"}>{m.cellId || "--"}</Field>
+                    <Field label="IP">{m.ipv4 || "--"}</Field>
                   </Grid>
 
-                  {/* 不同接口的可编辑区 */}
-                  {m.name === "wlan0" ? (
+                  {isWlan ? (
                     <Grid>
                       <Field label="模式">
                         <div className="w-32">
                           <Select
                             value={m.wifiMode}
-                            onValueChange={(v) => patchModem(m.id, { wifiMode: v })}
+                            onValueChange={(v) => patchModem(m.interfaceName, { wifiMode: v })}
+                            disabled={!online}
                           >
                             <SelectTrigger className="h-8">
                               <SelectValue />
@@ -422,16 +682,22 @@ export function NetworkSettingsPanel() {
                           <Field label="SSID">
                             <Input
                               value={m.wifiSsid}
-                              onChange={(e) => patchModem(m.id, { wifiSsid: e.target.value })}
+                              onChange={(ev) =>
+                                patchModem(m.interfaceName, { wifiSsid: ev.target.value })
+                              }
                               className="h-8 w-44"
+                              disabled={!online}
                             />
                           </Field>
                           <Field label="PSK">
                             <Input
                               type="password"
                               value={m.wifiPsk}
-                              onChange={(e) => patchModem(m.id, { wifiPsk: e.target.value })}
+                              onChange={(ev) =>
+                                patchModem(m.interfaceName, { wifiPsk: ev.target.value })
+                              }
                               className="h-8 w-44"
+                              disabled={!online}
                             />
                           </Field>
                         </>
@@ -442,19 +708,25 @@ export function NetworkSettingsPanel() {
                           min={0}
                           max={10}
                           value={m.routePriority}
-                          onChange={(e) =>
-                            patchModem(m.id, { routePriority: Number(e.target.value) })
+                          onChange={(ev) =>
+                            patchModem(m.interfaceName, {
+                              routePriority: Number(ev.target.value),
+                            })
                           }
                           className="h-8 w-20"
+                          disabled={!online}
                         />
                       </Field>
                     </Grid>
-                  ) : m.name === "wwan0" ? (
+                  ) : isWwan0 ? (
                     <Grid>
                       <Field label="自动拨号">
                         <Checkbox
                           checked={m.autoConnect}
-                          onCheckedChange={(v) => patchModem(m.id, { autoConnect: !!v })}
+                          onCheckedChange={(v) =>
+                            patchModem(m.interfaceName, { autoConnect: !!v })
+                          }
+                          disabled={!online}
                         />
                       </Field>
                       <Field label="路由优先级">
@@ -463,10 +735,13 @@ export function NetworkSettingsPanel() {
                           min={0}
                           max={10}
                           value={m.routePriority}
-                          onChange={(e) =>
-                            patchModem(m.id, { routePriority: Number(e.target.value) })
+                          onChange={(ev) =>
+                            patchModem(m.interfaceName, {
+                              routePriority: Number(ev.target.value),
+                            })
                           }
                           className="h-8 w-20"
+                          disabled={!online}
                         />
                       </Field>
                       <Field label="指令">
@@ -474,8 +749,11 @@ export function NetworkSettingsPanel() {
                           value={m.ext}
                           maxLength={32}
                           placeholder="文本输入框"
-                          onChange={(e) => patchModem(m.id, { ext: e.target.value })}
+                          onChange={(ev) =>
+                            patchModem(m.interfaceName, { ext: ev.target.value })
+                          }
                           className="h-8 w-40"
+                          disabled={!online}
                         />
                       </Field>
                     </Grid>
@@ -484,14 +762,18 @@ export function NetworkSettingsPanel() {
                       <Field label="自动拨号">
                         <Checkbox
                           checked={m.autoConnect}
-                          onCheckedChange={(v) => patchModem(m.id, { autoConnect: !!v })}
+                          onCheckedChange={(v) =>
+                            patchModem(m.interfaceName, { autoConnect: !!v })
+                          }
+                          disabled={!online}
                         />
                       </Field>
                       <Field label="制式">
                         <div className="w-32">
                           <Select
-                            value={m.nicMode}
-                            onValueChange={(v) => patchModem(m.id, { nicMode: v })}
+                            value={m.nicMode || "LTE+NR"}
+                            onValueChange={(v) => patchModem(m.interfaceName, { nicMode: v })}
+                            disabled={!online}
                           >
                             <SelectTrigger className="h-8">
                               <SelectValue />
@@ -511,8 +793,11 @@ export function NetworkSettingsPanel() {
                           value={m.ext}
                           maxLength={32}
                           placeholder="文本输入框"
-                          onChange={(e) => patchModem(m.id, { ext: e.target.value })}
+                          onChange={(ev) =>
+                            patchModem(m.interfaceName, { ext: ev.target.value })
+                          }
                           className="h-8 w-40"
+                          disabled={!online}
                         />
                       </Field>
                       <Field label="路由优先级">
@@ -521,17 +806,27 @@ export function NetworkSettingsPanel() {
                           min={0}
                           max={10}
                           value={m.routePriority}
-                          onChange={(e) =>
-                            patchModem(m.id, { routePriority: Number(e.target.value) })
+                          onChange={(ev) =>
+                            patchModem(m.interfaceName, {
+                              routePriority: Number(ev.target.value),
+                            })
                           }
                           className="h-8 w-20"
+                          disabled={!online}
                         />
                       </Field>
                     </Grid>
                   )}
 
                   <div className="flex justify-end">
-                    <Button size="sm" onClick={() => toast.success(`${m.name} 已修改`)}>
+                    <Button
+                      size="sm"
+                      onClick={() => saveModem(m)}
+                      disabled={!online || saving === m.interfaceName}
+                    >
+                      {saving === m.interfaceName && (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                      )}
                       修改
                     </Button>
                   </div>
