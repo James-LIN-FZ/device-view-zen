@@ -207,28 +207,32 @@ export function SystemInfoPanel({ serialNo, online }: { serialNo: string; online
     }
   };
 
+  if (status !== "ready") {
+    return <PanelStatusView status={status} onRetry={() => void loadInfo()} />;
+  }
+
   return (
     <div className="-mt-2 -ml-2 max-w-4xl space-y-6">
       {/* ====== 系统信息 ====== */}
       <section>
         <h3 className="text-sm font-medium mb-3">系统信息</h3>
         <div className="border border-border rounded-md px-4 py-3 grid grid-cols-2 gap-x-8 gap-y-2">
-          <Row label="设备型号" value={loading ? "加载中..." : deviceName} />
-          <Row label="管理账号" value={loading ? "加载中..." : `${iFrpClientId}@${sFrpServer}`} />
-          <Row label="系统版本" value={loading ? "加载中..." : model} />
+          <Row label="设备型号" value={deviceName} />
+          <Row label="管理账号" value={`${iFrpClientId}@${sFrpServer}`} />
+          <Row label="系统版本" value={model} />
           <Row
             label="NTP状态"
             value={
               <span className="flex items-center gap-2">
-                {loading ? "加载中..." : ntpStatus}
+                {ntpStatus}
                 <Button size="sm" variant="outline" className="h-6 px-2" onClick={syncNtp} disabled={!online}>
                   同步
                 </Button>
               </span>
             }
           />
-          <Row label="序列号" value={loading ? "加载中..." : serialNumber} />
-          <Row label="特性" value={loading ? "加载中..." : feature} />
+          <Row label="序列号" value={serialNumber} />
+          <Row label="特性" value={feature} />
           <Row
             label="激活码"
             value={
