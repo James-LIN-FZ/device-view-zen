@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, Play, Square, ArrowLeft, Trash2, Loader2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PanelStatusView, type PanelLoadStatus } from "@/components/PanelStatus";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -191,6 +192,7 @@ export function EncodingTasksPanel({
   const [tasks, setTasks] = useState<DeviceEncodeTask[]>([]);
   const [templates, setTemplates] = useState<DeviceTemplate[]>([]);
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<PanelLoadStatus>("loading");
   const [editingTask, setEditingTask] = useState<DeviceEncodeTask | null>(null);
   const [editForm, setEditForm] = useState<EditForm>(EMPTY_FORM);
   const [createOpen, setCreateOpen] = useState(false);
@@ -218,22 +220,36 @@ export function EncodingTasksPanel({
     setLoading(false);
     if (result?.status === "ok") {
       setTasks(parseEncodeTasks(result.data));
+      return true;
     }
+    return false;
   };
 
   const loadTemplates = async () => {
-    if (!serialNo || !online) return;
+    if (!serialNo || !online) return false;
     const result = await rpcCall(serialNo, "GET", "/template");
-    if (!mountedRef.current) return;
+    if (!mountedRef.current) return false;
     if (result?.status === "ok") {
       setTemplates(parseTemplates(result.data));
+      return true;
     }
+    return false;
+  };
+
+  const loadAll = async () => {
+    setStatus("loading");
+    if (!online) {
+      setStatus("error");
+      return;
+    }
+    const [t, p] = await Promise.all([loadTasks(), loadTemplates()]);
+    if (!mountedRef.current) return;
+    setStatus(t && p ? "ready" : "error");
   };
 
   useEffect(() => {
     setTasks([]);
-    void loadTasks();
-    void loadTemplates();
+    void loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serialNo, online]);
 
@@ -329,6 +345,10 @@ export function EncodingTasksPanel({
   };
 
   // ── Edit panel ────────────────────────────────────────────────────────────
+
+  if (status !== "ready" && !editingTask) {
+    return <PanelStatusView status={status} onRetry={() => void loadAll()} />;
+  }
 
   if (editingTask) {
     return (

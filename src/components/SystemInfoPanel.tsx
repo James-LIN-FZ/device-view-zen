@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react";
+import { PanelStatusView, type PanelLoadStatus } from "@/components/PanelStatus";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -37,7 +38,7 @@ export function SystemInfoPanel({ serialNo, online }: { serialNo: string; online
   const mountedRef = useRef(true);
 
   // 系统信息
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<PanelLoadStatus>("loading");
   const [deviceName, setDeviceName] = useState("");
   const [model, setModel] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
@@ -77,38 +78,40 @@ export function SystemInfoPanel({ serialNo, online }: { serialNo: string; online
   }, []);
 
   useEffect(() => {
-    if (!online) return;
+    if (!online) {
+      setStatus("error");
+      return;
+    }
     void loadInfo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serialNo, online]);
 
   async function loadInfo() {
     if (!mountedRef.current) return;
-    setLoading(true);
-    try {
-      const infoReply = await rpcCall(serialNo, "GET", "/system/deviceinfo");
-      if (!mountedRef.current) return;
-      if (infoReply?.status === "ok" && Array.isArray(infoReply.data)) {
-        const items = infoReply.data as { name: string; value: unknown }[];
-        const get = (n: string) => (items.find((i) => i.name === n)?.value as string) ?? "";
-        setDeviceName(get("deviceName"));
-        setModel(get("model"));
-        setSerialNumber(get("serialNumber"));
-        setActivationKey(get("key"));
-        setIFrpClientId(get("iFrpClientId"));
-        setSFrpServer(get("sFrpServer"));
-        setNtpStatus(get("sNtpStatus") || "--");
-        setFeature(get("sFeature") || "--");
-        setSserver(get("sSSServer"));
-        setSkey(get("sSSKey"));
-        setSGTHost(get("sGTHost"));
-        setSGTPeer(get("sGTPeer"));
-        setSFileServer(get("sFileServer"));
-        setActivated(get("iVerifyResult") === "1");
-      }
-    } finally {
-      if (mountedRef.current) setLoading(false);
+    setStatus("loading");
+    const infoReply = await rpcCall(serialNo, "GET", "/system/deviceinfo");
+    if (!mountedRef.current) return;
+    if (infoReply?.status !== "ok" || !Array.isArray(infoReply.data)) {
+      setStatus("error");
+      return;
     }
+    const items = infoReply.data as { name: string; value: unknown }[];
+    const get = (n: string) => (items.find((i) => i.name === n)?.value as string) ?? "";
+    setDeviceName(get("deviceName"));
+    setModel(get("model"));
+    setSerialNumber(get("serialNumber"));
+    setActivationKey(get("key"));
+    setIFrpClientId(get("iFrpClientId"));
+    setSFrpServer(get("sFrpServer"));
+    setNtpStatus(get("sNtpStatus") || "--");
+    setFeature(get("sFeature") || "--");
+    setSserver(get("sSSServer"));
+    setSkey(get("sSSKey"));
+    setSGTHost(get("sGTHost"));
+    setSGTPeer(get("sGTPeer"));
+    setSFileServer(get("sFileServer"));
+    setActivated(get("iVerifyResult") === "1");
+    setStatus("ready");
   }
 
   const confirmActivation = async () => {
@@ -204,28 +207,32 @@ export function SystemInfoPanel({ serialNo, online }: { serialNo: string; online
     }
   };
 
+  if (status !== "ready") {
+    return <PanelStatusView status={status} onRetry={() => void loadInfo()} />;
+  }
+
   return (
     <div className="-mt-2 -ml-2 max-w-4xl space-y-6">
       {/* ====== 系统信息 ====== */}
       <section>
         <h3 className="text-sm font-medium mb-3">系统信息</h3>
         <div className="border border-border rounded-md px-4 py-3 grid grid-cols-2 gap-x-8 gap-y-2">
-          <Row label="设备型号" value={loading ? "加载中..." : deviceName} />
-          <Row label="管理账号" value={loading ? "加载中..." : `${iFrpClientId}@${sFrpServer}`} />
-          <Row label="系统版本" value={loading ? "加载中..." : model} />
+          <Row label="设备型号" value={deviceName} />
+          <Row label="管理账号" value={`${iFrpClientId}@${sFrpServer}`} />
+          <Row label="系统版本" value={model} />
           <Row
             label="NTP状态"
             value={
               <span className="flex items-center gap-2">
-                {loading ? "加载中..." : ntpStatus}
+                {ntpStatus}
                 <Button size="sm" variant="outline" className="h-6 px-2" onClick={syncNtp} disabled={!online}>
                   同步
                 </Button>
               </span>
             }
           />
-          <Row label="序列号" value={loading ? "加载中..." : serialNumber} />
-          <Row label="特性" value={loading ? "加载中..." : feature} />
+          <Row label="序列号" value={serialNumber} />
+          <Row label="特性" value={feature} />
           <Row
             label="激活码"
             value={
