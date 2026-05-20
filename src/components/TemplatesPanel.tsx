@@ -559,6 +559,12 @@ export function TemplatesPanel({
   const customRes = editing.resolution === "自定义";
   const customBr = editing.bitrateMode === "自定义";
 
+  // ── Loading / error overlay ───────────────────────────────────────────────
+
+  if (status !== "ready" && !editingTemplate) {
+    return <PanelStatusView status={status} onRetry={() => void loadTemplates()} />;
+  }
+
   // ── Edit panel ────────────────────────────────────────────────────────────
 
   if (editingTemplate) {
