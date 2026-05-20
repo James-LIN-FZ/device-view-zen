@@ -204,13 +204,8 @@ export function VoiceCallPanel({
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  if (loading) {
-    return (
-      <div className="flex items-center gap-2 py-8 text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        <span className="text-sm">加载中…</span>
-      </div>
-    );
+  if (status !== "ready") {
+    return <PanelStatusView status={status} onRetry={() => void loadAll()} />;
   }
 
   return (
