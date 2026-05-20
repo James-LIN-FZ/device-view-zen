@@ -149,7 +149,7 @@ export function VoiceCallPanel({
   useEffect(() => {
     mountedRef.current = true;
     isRefreshingRef.current = false;
-    setLoading(true);
+    
     void loadAll();
     const timer = setInterval(refreshCall, 3000);
     return () => {
