@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, ArrowLeft, Trash2, Loader2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PanelStatusView, type PanelLoadStatus } from "@/components/PanelStatus";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -465,6 +466,7 @@ export function TemplatesPanel({
 }) {
   const [templates, setTemplates] = useState<DeviceTemplate[]>([]);
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<PanelLoadStatus>("loading");
   const [saving, setSaving] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<DeviceTemplate | null>(null);
   const [editForm, setEditForm] = useState<EditForm>(DEFAULT_FORM);
@@ -488,11 +490,15 @@ export function TemplatesPanel({
 
   async function loadTemplates() {
     setLoading(true);
+    if (status === "error") setStatus("loading");
     const result = await rpcCall(serialNo, "GET", "/template");
     if (!mountedRef.current) return;
     setLoading(false);
     if (result?.status === "ok") {
       setTemplates(parseTemplates(result.data));
+      setStatus("ready");
+    } else {
+      setStatus("error");
     }
   }
 
