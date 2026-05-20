@@ -245,7 +245,7 @@ export function NetworkSettingsPanel({
   const mountedRef = useRef(true);
   const isRefreshingRef = useRef(false);
 
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<PanelLoadStatus>("loading");
   const [eths, setEths] = useState<EthernetIf[]>([]);
   const [modems, setModems] = useState<ModemIf[]>([]);
   const [gwEnabled, setGwEnabled] = useState(false);
@@ -316,8 +316,9 @@ export function NetworkSettingsPanel({
   }
 
   async function loadAll() {
+    setStatus("loading");
     if (!online) {
-      setLoading(false);
+      setStatus("error");
       return;
     }
     const [netReply, aggReply, gwReply] = await Promise.all([
@@ -326,7 +327,11 @@ export function NetworkSettingsPanel({
       rpcCall(serialNo, "GET", "/net/gw"),
     ]);
     if (!mountedRef.current) return;
-    if (netReply?.status === "ok") applyNetItems(parseNetItems(netReply.data), true);
+    if (netReply?.status !== "ok") {
+      setStatus("error");
+      return;
+    }
+    applyNetItems(parseNetItems(netReply.data), true);
     if (aggReply?.status === "ok") {
       const d = aggReply.data as Record<string, unknown>;
       setAggEnabled(d?.iPower === 1);
@@ -335,7 +340,7 @@ export function NetworkSettingsPanel({
       const d = gwReply.data as Record<string, unknown>;
       setGwEnabled(d?.iPower === 1);
     }
-    setLoading(false);
+    setStatus("ready");
   }
 
   async function refreshSpeeds() {
@@ -353,7 +358,6 @@ export function NetworkSettingsPanel({
   useEffect(() => {
     mountedRef.current = true;
     isRefreshingRef.current = false;
-    setLoading(true);
     loadAll();
     const timer = setInterval(() => {
       refreshSpeeds();
@@ -428,13 +432,8 @@ export function NetworkSettingsPanel({
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  if (loading) {
-    return (
-      <div className="flex items-center gap-2 py-8 text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        <span className="text-sm">加载中…</span>
-      </div>
-    );
+  if (status !== "ready") {
+    return <PanelStatusView status={status} onRetry={() => void loadAll()} />;
   }
 
   return (
