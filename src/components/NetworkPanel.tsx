@@ -214,7 +214,7 @@ export function NetworkPanel({ serialNo, online, payload }: { serialNo: string; 
                   </div>
                 </div>
               </div>
-              <div className="flex-1 min-h-0 -mx-2 -mb-3">
+              <div className="flex-1 min-h-0 -mx-1 -mb-1">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={data} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
                     <defs>
