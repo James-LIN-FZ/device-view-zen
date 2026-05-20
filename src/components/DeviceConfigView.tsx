@@ -103,7 +103,7 @@ export function DeviceConfigView({
             ) : active === "network" ? (
               <NetworkSettingsPanel serialNo={device.serialNo} online={device.online} />
             ) : active === "voice" ? (
-              <VoiceCallPanel />
+              <VoiceCallPanel serialNo={device.serialNo} online={device.online} />
             ) : active === "system" ? (
               <SystemInfoPanel />
             ) : (
