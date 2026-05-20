@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react";
+import { PanelStatusView, type PanelLoadStatus } from "@/components/PanelStatus";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -37,7 +38,7 @@ export function SystemInfoPanel({ serialNo, online }: { serialNo: string; online
   const mountedRef = useRef(true);
 
   // 系统信息
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<PanelLoadStatus>("loading");
   const [deviceName, setDeviceName] = useState("");
   const [model, setModel] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
@@ -77,38 +78,40 @@ export function SystemInfoPanel({ serialNo, online }: { serialNo: string; online
   }, []);
 
   useEffect(() => {
-    if (!online) return;
+    if (!online) {
+      setStatus("error");
+      return;
+    }
     void loadInfo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serialNo, online]);
 
   async function loadInfo() {
     if (!mountedRef.current) return;
-    setLoading(true);
-    try {
-      const infoReply = await rpcCall(serialNo, "GET", "/system/deviceinfo");
-      if (!mountedRef.current) return;
-      if (infoReply?.status === "ok" && Array.isArray(infoReply.data)) {
-        const items = infoReply.data as { name: string; value: unknown }[];
-        const get = (n: string) => (items.find((i) => i.name === n)?.value as string) ?? "";
-        setDeviceName(get("deviceName"));
-        setModel(get("model"));
-        setSerialNumber(get("serialNumber"));
-        setActivationKey(get("key"));
-        setIFrpClientId(get("iFrpClientId"));
-        setSFrpServer(get("sFrpServer"));
-        setNtpStatus(get("sNtpStatus") || "--");
-        setFeature(get("sFeature") || "--");
-        setSserver(get("sSSServer"));
-        setSkey(get("sSSKey"));
-        setSGTHost(get("sGTHost"));
-        setSGTPeer(get("sGTPeer"));
-        setSFileServer(get("sFileServer"));
-        setActivated(get("iVerifyResult") === "1");
-      }
-    } finally {
-      if (mountedRef.current) setLoading(false);
+    setStatus("loading");
+    const infoReply = await rpcCall(serialNo, "GET", "/system/deviceinfo");
+    if (!mountedRef.current) return;
+    if (infoReply?.status !== "ok" || !Array.isArray(infoReply.data)) {
+      setStatus("error");
+      return;
     }
+    const items = infoReply.data as { name: string; value: unknown }[];
+    const get = (n: string) => (items.find((i) => i.name === n)?.value as string) ?? "";
+    setDeviceName(get("deviceName"));
+    setModel(get("model"));
+    setSerialNumber(get("serialNumber"));
+    setActivationKey(get("key"));
+    setIFrpClientId(get("iFrpClientId"));
+    setSFrpServer(get("sFrpServer"));
+    setNtpStatus(get("sNtpStatus") || "--");
+    setFeature(get("sFeature") || "--");
+    setSserver(get("sSSServer"));
+    setSkey(get("sSSKey"));
+    setSGTHost(get("sGTHost"));
+    setSGTPeer(get("sGTPeer"));
+    setSFileServer(get("sFileServer"));
+    setActivated(get("iVerifyResult") === "1");
+    setStatus("ready");
   }
 
   const confirmActivation = async () => {
