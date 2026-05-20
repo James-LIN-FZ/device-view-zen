@@ -876,7 +876,7 @@ export function TemplatesPanel({
             <div
               key={t.id}
               onClick={() => openEdit(t)}
-              className="aspect-[16/10] rounded-lg border-2 border-primary/60 bg-muted/30 hover:border-primary hover:shadow-lg transition-all cursor-pointer p-2.5 flex flex-col"
+              className="relative aspect-[16/10] rounded-lg border-2 border-primary/60 bg-muted/30 hover:border-primary hover:shadow-lg transition-all cursor-pointer p-2.5"
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex gap-1.5 shrink-0">
@@ -893,8 +893,8 @@ export function TemplatesPanel({
                 </div>
                 <span className="text-sm font-semibold truncate">{t.sName}</span>
               </div>
-              <div className="flex-1 flex items-center justify-center px-2 text-center">
-                <span className="text-xs text-foreground/90">{t.sDescriptor ?? ""}</span>
+              <div className="absolute inset-0 flex items-center justify-center px-3 text-center pointer-events-none">
+                <span className="text-sm text-foreground/90 leading-snug">{t.sDescriptor ?? ""}</span>
               </div>
             </div>
           ))}
