@@ -346,6 +346,10 @@ export function EncodingTasksPanel({
 
   // ── Edit panel ────────────────────────────────────────────────────────────
 
+  if (status !== "ready" && !editingTask) {
+    return <PanelStatusView status={status} onRetry={() => void loadAll()} />;
+  }
+
   if (editingTask) {
     return (
       <div className="-mt-2 -ml-2">
