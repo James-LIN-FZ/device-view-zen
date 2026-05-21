@@ -70,7 +70,7 @@ export interface BackendDeviceStatusData {
   };
 }
 
-function getApiBaseUrl(): string {
+export function getApiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
   return (configured?.trim() || "http://127.0.0.1:18081").replace(/\/$/, "");
 }

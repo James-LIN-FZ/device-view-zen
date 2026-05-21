@@ -70,14 +70,14 @@ export function PanelStatusView({
 }) {
   if (status === "loading") {
     return (
-      <div className="relative h-full min-h-[240px]">
+      <div className="relative w-full h-full min-h-[240px]">
         <PanelLoading label={loadingLabel} />
       </div>
     );
   }
   if (status === "error") {
     return (
-      <div className="relative h-full min-h-[240px]">
+      <div className="relative w-full h-full min-h-[240px]">
         <PanelError message={errorLabel} onRetry={onRetry} />
       </div>
     );

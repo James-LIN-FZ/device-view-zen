@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Workflow,
   Server,
@@ -14,7 +14,9 @@ import {
   Cloud,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { BackendDevice } from "@/lib/device-api";
+import { rpcCall, getApiBaseUrl, type BackendDevice } from "@/lib/device-api";
+import { getAuthToken } from "@/lib/auth";
+import { PanelStatusView, type PanelLoadStatus } from "@/components/PanelStatus";
 
 export type PushType = "srt" | "rtsp" | "rtmp";
 export type AiTaskType = "ai_enhance" | "smart_hd" | "cloud_record";
@@ -30,9 +32,35 @@ interface PushSlot {
   latencyMs?: number;
 }
 
-const SMUX_SERVER = { host: "smux.local", port: 8080 };
-const SRT_PULL = `srt://${SMUX_SERVER.host}:9000?streamid=pull`;
-const RTSP_PULL = `rtsp://${SMUX_SERVER.host}:8554/live`;
+/** Raw slot record returned by /api/ubserv_streams */
+interface ServerStream {
+  id: number;       // 1-based slot index
+  type: string;     // e.g. "RTSP_PUSH", "SRT_PUSH", "RTMP_PUSH"
+  push_url: string;
+  magic: string;
+}
+
+const SERVER_TYPE_MAP: Partial<Record<string, TaskType>> = {
+  SRT_PUSH: "srt",
+  RTSP_PUSH: "rtsp",
+  RTMP_PUSH: "rtmp",
+};
+
+const PUSH_TYPE_TO_SERVER: Record<PushType, string> = {
+  srt: "SRT_PUSH",
+  rtsp: "RTSP_PUSH",
+  rtmp: "RTMP_PUSH",
+};
+
+/** Deterministic 6-char hex magic derived from the push URL (djb2 variant). */
+function urlToMagic(url: string): string {
+  let h = 5381;
+  for (let i = 0; i < url.length; i++) {
+    h = (((h << 5) + h) ^ url.charCodeAt(i)) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0").slice(0, 6);
+}
+
 const SLOT_COUNT = 4;
 
 const PUSH_META: Record<TaskType, { label: string; Icon: typeof Upload; placeholder: string }> = {
@@ -57,6 +85,7 @@ export function SmartStreamView({
   devices: BackendDevice[];
   selectedSn: string;
 }) {
+  const mountedRef = useRef(true);
   const [pipelines, setPipelines] = useState<Record<string, Pipeline>>({});
   const [draft, setDraft] = useState<Pipeline>(emptyPipeline());
   const [dragType, setDragType] = useState<TaskType | null>(null);
@@ -66,6 +95,20 @@ export function SmartStreamView({
   const [editingUrl, setEditingUrl] = useState("");
   const [editingLatency, setEditingLatency] = useState("");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [status, setStatus] = useState<PanelLoadStatus>("loading");
+  const [saving, setSaving] = useState(false);
+  const [smuxHost, setSmuxHost] = useState("");
+  const [smuxPort, setSmuxPort] = useState(0);
+  const [serverSlots, setServerSlots] = useState<ServerStream[]>([]);
+
+  const device = useMemo(
+    () => devices.find((d) => d.serialNo === selectedSn) ?? null,
+    [devices, selectedSn],
+  );
+
+  // sGTPeer port is the SRT port; RTSP port = srtPort + 2000
+  const srtPull = smuxHost && smuxPort ? `srt://${smuxHost}:${smuxPort}` : "—";
+  const rtspPull = smuxHost && smuxPort ? `rtsp://${smuxHost}:${smuxPort + 2000}/main` : "—";
 
   const copyToClipboard = async (key: string, text: string) => {
     try {
@@ -77,18 +120,85 @@ export function SmartStreamView({
     }
   };
 
-  // Load draft when device changes
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Load draft and device info when device changes
   useEffect(() => {
     setDraft(pipelines[selectedSn] ?? emptyPipeline());
     setSelectedNode(null);
     setEditingSlot(null);
+    if (!selectedSn) return;
+    void loadDeviceInfo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSn]);
+  }, [selectedSn, device?.online]);
 
-  const device = useMemo(
-    () => devices.find((d) => d.serialNo === selectedSn) ?? null,
-    [devices, selectedSn],
-  );
+  async function loadDeviceInfo() {
+    if (!device) return;
+    if (!device.online) {
+      setStatus("error");
+      return;
+    }
+    setStatus("loading");
+    const reply = await rpcCall(selectedSn, "GET", "/system/deviceinfo");
+    if (!mountedRef.current) return;
+    if (reply?.status !== "ok" || !Array.isArray(reply.data)) {
+      setStatus("error");
+      return;
+    }
+    const items = reply.data as { name: string; value: unknown }[];
+    const get = (n: string) => (items.find((i) => i.name === n)?.value as string) ?? "";
+    const sGTHost = get("sGTHost").trim();
+    const sGTPeer = get("sGTPeer").trim();
+    // sGTPeer is a plain port number (e.g. 15001)
+    const parsedPort = parseInt(sGTPeer, 10);
+    const port = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 0;
+    setSmuxHost(sGTHost);
+    setSmuxPort(port);
+
+    // Fetch slot configuration via backend proxy (avoids CORS)
+    let streams: ServerStream[] = [];
+    if (sGTHost && port > 0) {
+      try {
+        const token = getAuthToken();
+        const proxyUrl = `${getApiBaseUrl()}/api/devices/${encodeURIComponent(selectedSn)}/ubserv-streams?host=${encodeURIComponent(sGTHost)}&port=${port + 4000}`;
+        const resp = await fetch(proxyUrl, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (resp.ok) {
+          const data: unknown = await resp.json();
+          if (Array.isArray(data)) streams = data as ServerStream[];
+        }
+      } catch {
+        // network unreachable — leave slots empty
+      }
+    }
+    if (!mountedRef.current) return;
+
+    setServerSlots(streams);
+
+    // Map server streams → pipeline slots
+    const serverPipeline = emptyPipeline();
+    for (const s of streams) {
+      const idx = s.id - 1; // server id is 1-based
+      if (idx < 0 || idx >= SLOT_COUNT) continue;
+      const taskType = SERVER_TYPE_MAP[s.type];
+      if (!taskType) continue;
+      serverPipeline.slots[idx] = {
+        type: taskType,
+        url: s.push_url,
+        ...(taskType === "srt" ? { latencyMs: 120 } : {}),
+      };
+    }
+    // Treat server state as the saved baseline so dirty-check works correctly
+    setPipelines((prev) => ({ ...prev, [selectedSn]: serverPipeline }));
+    setDraft(serverPipeline);
+    setStatus("ready");
+  }
 
   const dirty = useMemo(() => {
     const saved = pipelines[selectedSn] ?? emptyPipeline();
@@ -171,9 +281,42 @@ export function SmartStreamView({
     setSelectedNode(null);
   };
 
-  const handleApply = () => {
-    if (!selectedSn) return;
-    setPipelines((prev) => ({ ...prev, [selectedSn]: { slots: [...draft.slots] } }));
+  const handleApply = async () => {
+    if (!selectedSn || !smuxHost || smuxPort <= 0) return;
+
+    // Convert draft slots back to server format
+    const body: ServerStream[] = [];
+    for (let i = 0; i < draft.slots.length; i++) {
+      const slot = draft.slots[i];
+      if (!slot || !isPushType(slot.type)) continue;
+      body.push({
+        id: i + 1,
+        type: PUSH_TYPE_TO_SERVER[slot.type],
+        push_url: slot.url,
+        magic: urlToMagic(slot.url),
+      });
+    }
+
+    setSaving(true);
+    try {
+      const token = getAuthToken();
+      const proxyUrl = `${getApiBaseUrl()}/api/devices/${encodeURIComponent(selectedSn)}/ubserv-streams?host=${encodeURIComponent(smuxHost)}&port=${smuxPort + 4000}`;
+      const resp = await fetch(proxyUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+      if (resp.ok) {
+        setPipelines((prev) => ({ ...prev, [selectedSn]: { slots: [...draft.slots] } }));
+      }
+    } catch {
+      // network error — stay dirty so user can retry
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -188,7 +331,7 @@ export function SmartStreamView({
           <button
             type="button"
             onClick={handleReset}
-            disabled={!dirty}
+            disabled={!dirty || saving}
             className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:border-primary/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <RotateCcw className="h-3 w-3" />
@@ -196,12 +339,12 @@ export function SmartStreamView({
           </button>
           <button
             type="button"
-            onClick={handleApply}
-            disabled={!dirty}
+            onClick={() => void handleApply()}
+            disabled={!dirty || saving}
             className="inline-flex items-center gap-1 rounded-md border border-primary/60 bg-primary/15 px-2.5 py-1 text-[11px] text-primary hover:bg-primary/25 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <Check className="h-3 w-3" />
-            应用
+            {saving ? "应用中…" : "应用"}
           </button>
         </div>
       </div>
@@ -209,7 +352,7 @@ export function SmartStreamView({
       {/* Pipeline area */}
       <div className="relative flex-1 min-h-0 overflow-auto p-4 flex items-center justify-center">
         {/* Draggable task palette pinned to top-left — two columns */}
-        <div className="absolute top-3 left-3 z-10 flex gap-3">
+        {device && status === "ready" && <div className="absolute top-3 left-3 z-10 flex gap-3">
           {[
             { title: "推流任务", types: PUSH_TYPES as TaskType[] },
             { title: "AI 任务", types: AI_TYPES as TaskType[] },
@@ -243,14 +386,17 @@ export function SmartStreamView({
               })}
             </div>
           ))}
-        </div>
-
+        </div>}
 
         {!device ? (
           <div className="text-xs text-muted-foreground">
             请从左侧选择一个设备查看智流 pipeline
           </div>
         ) : (
+          <PanelStatusView
+            status={status}
+            onRetry={() => void loadDeviceInfo()}
+          >
           <div className="flex items-center gap-3 min-w-max mx-auto">
             {/* Device node */}
             <PipelineNode
@@ -267,7 +413,7 @@ export function SmartStreamView({
             <PipelineNode
               icon={<Server className="h-5 w-5" />}
               title="S-Mux 服务器"
-              subtitle={`${SMUX_SERVER.host}:${SMUX_SERVER.port}`}
+              subtitle={smuxHost ? `${smuxHost}:${smuxPort}` : "—"}
               tone="server"
               active={selectedNode === "smux"}
               onClick={() => setSelectedNode("smux")}
@@ -281,22 +427,22 @@ export function SmartStreamView({
               <FixedNode
                 icon={<Video className="h-4 w-4" />}
                 title="SRT Server"
-                detail={SRT_PULL}
+                detail={srtPull}
                 copied={copiedKey === "srt-server"}
                 onClick={() => {
                   setSelectedNode("srt-server");
-                  copyToClipboard("srt-server", SRT_PULL);
+                  copyToClipboard("srt-server", srtPull);
                 }}
               />
               {/* Fixed: RTSP Server */}
               <FixedNode
                 icon={<Video className="h-4 w-4" />}
                 title="RTSP Server"
-                detail={RTSP_PULL}
+                detail={rtspPull}
                 copied={copiedKey === "rtsp-server"}
                 onClick={() => {
                   setSelectedNode("rtsp-server");
-                  copyToClipboard("rtsp-server", RTSP_PULL);
+                  copyToClipboard("rtsp-server", rtspPull);
                 }}
               />
 
@@ -438,6 +584,7 @@ export function SmartStreamView({
               })}
             </div>
           </div>
+          </PanelStatusView>
         )}
       </div>
     </section>
