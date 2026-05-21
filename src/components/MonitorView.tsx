@@ -1,25 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X, MonitorPlay, RefreshCw, Play } from "lucide-react";
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, Customized, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { fetchDeviceStatus, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
-import { getAuthToken } from "@/lib/auth";
+import { subscribeDeviceWs } from "@/lib/device-ws";
 import { cn } from "@/lib/utils";
 
 const SLOT_COUNT = 8;
 const POINTS = 30;
 const CHART_COLOR = "var(--color-primary)";
-const GRID_COLOR = "var(--color-grid-line)";
+const GRID_COLOR = "rgba(120, 120, 140, 0.3)";
 
 type Sample = { t: number; up: number; down: number };
 type QualitySample = { t: number; rtt: number; loss: number };
-
-function getWsBaseUrl(): string {
-  const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
-  const httpBase = (configured?.trim() || "http://127.0.0.1:18081").replace(/\/$/, "");
-  if (httpBase.startsWith("https://")) return `wss://${httpBase.slice(8)}`;
-  if (httpBase.startsWith("http://")) return `ws://${httpBase.slice(7)}`;
-  return httpBase;
-}
 
 function asNum(v: unknown): number {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -223,6 +215,21 @@ function EmptyTile({ label, hint }: { label: string; hint?: string }) {
   );
 }
 
+function GridLines(props: Record<string, unknown>) {
+  const offset = props.offset as { top: number; left: number; width: number; height: number } | undefined;
+  if (!offset || offset.width <= 0 || offset.height <= 0) return null;
+  const { top, left, width, height } = offset;
+  return (
+    <g stroke={GRID_COLOR} strokeWidth={0.6}>
+      <line x1={left} x2={left + width} y1={top + height / 3} y2={top + height / 3} />
+      <line x1={left} x2={left + width} y1={top + (height * 2) / 3} y2={top + (height * 2) / 3} />
+      {[1, 2, 3, 4].map((i) => (
+        <line key={i} x1={left + (width * i) / 5} x2={left + (width * i) / 5} y1={top} y2={top + height} />
+      ))}
+    </g>
+  );
+}
+
 function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: () => void }) {
   const fallbackCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [status, setStatus] = useState<BackendDeviceStatusData | null>(null);
@@ -240,7 +247,7 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
     setOnlineState(device.online);
   }, [device.online]);
 
-  // Poll status
+  // Status fetch + WS (codec/presence events trigger immediate re-fetch; 5s poll as fallback)
   useEffect(() => {
     let active = true;
     const load = () => {
@@ -258,32 +265,17 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
         .catch(() => {});
     };
     load();
-    const id = setInterval(load, 5000);
+    const pollId = setInterval(load, 5000);
+    const unsubscribe = subscribeDeviceWs(device.serialNo, (msg) => {
+      if (typeof msg.online === "boolean") setOnlineState(msg.online);
+      if (msg.type === "network") latestRef.current = sumNetwork(msg.payload);
+      if (msg.type === "codec" || msg.type === "presence") load();
+    });
     return () => {
       active = false;
-      clearInterval(id);
+      clearInterval(pollId);
+      unsubscribe();
     };
-  }, [device.serialNo]);
-
-  // WS for network
-  useEffect(() => {
-    const token = getAuthToken();
-    if (!token) return;
-    const ws = new WebSocket(
-      `${getWsBaseUrl()}/api/ws/devices/${encodeURIComponent(device.serialNo)}?token=${encodeURIComponent(token)}`,
-    );
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(String(event.data)) as { type?: string; payload?: unknown; online?: boolean };
-        if (typeof msg.online === "boolean") setOnlineState(msg.online);
-        if (msg.type === "network") {
-          latestRef.current = sumNetwork(msg.payload);
-        }
-      } catch {
-        // ignore
-      }
-    };
-    return () => ws.close();
   }, [device.serialNo]);
 
   // Sampler
@@ -383,10 +375,9 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
     (status?.sVideoCodec?.iWidth && status?.sVideoCodec?.iHeight
       ? `${status.sVideoCodec.iWidth}×${status.sVideoCodec.iHeight}`
       : "--");
-  const fps = status?.sVideoCodec?.iFPS || status?.sVideoParams?.iFPS || 0;
+  const fps = status?.sVideoCodec?.iActFPS || status?.sVideoCodec?.iFPS || status?.sVideoParams?.iFPS || 0;
   const actBitrate = status?.sVideoCodec?.sActBitrate || status?.sVideoCodec?.sBitrate || "--";
   const videoSource = status?.sVideoParams?.sDevice || "--";
-  const audioSource = status?.sAudioParams?.sDevice || "--";
   
 
   return (
@@ -495,11 +486,10 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
         <div className="overflow-y-auto border-r border-border text-[10px] divide-y divide-border min-h-0">
           <ParamRow k="视频源" v={videoSource} />
           <ParamRow k="视频编码" v={videoCodec} />
-          <ParamRow k="分辨率" v={resolution} />
-          <ParamRow k="帧率" v={fps > 0 ? `${fps} fps` : "--"} />
-          <ParamRow k="码率" v={actBitrate} highlight />
-          <ParamRow k="音频源" v={audioSource} />
           <ParamRow k="音频编码" v={audioCodec} />
+          <ParamRow k="编码分辨率" v={resolution} />
+          <ParamRow k="实时码率" v={actBitrate} highlight />
+          <ParamRow k="实时帧率" v={fps > 0 ? `${fps} fps` : "--"} highlight />
         </div>
 
         {/* Charts: quality (top) + network (bottom) */}
@@ -524,7 +514,8 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="t" hide />
-                  <YAxis width={24} tick={{ fill: "var(--color-muted-foreground)", fontSize: 8 }} tickLine={false} axisLine={{ stroke: GRID_COLOR }} domain={[0, "auto"]} />
+                  <YAxis width={0} tick={false} tickLine={false} axisLine={false} domain={[0, "auto"]} />
+                  <Customized component={GridLines} />
                   <Tooltip
                     contentStyle={{
                       background: "var(--color-popover)",
@@ -563,8 +554,8 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
             <div className="px-2 py-1 border-b border-border flex items-center justify-between text-[10px]">
               <span className="text-muted-foreground">网络</span>
               <span className="font-mono tabular-nums text-primary">
-                ↑{last.up.toFixed(1)}
-                <span className="text-muted-foreground">/</span>↓{last.down.toFixed(1)}
+                ↑  {last.up.toFixed(1) } kbps
+                <span className="text-muted-foreground">/</span>↓  {last.down.toFixed(1)} kbps
               </span>
             </div>
             <div className="flex-1 min-h-0">
@@ -577,7 +568,8 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="t" hide />
-                  <YAxis width={24} tick={{ fill: "var(--color-muted-foreground)", fontSize: 8 }} tickLine={false} axisLine={{ stroke: GRID_COLOR }} domain={[0, "auto"]} />
+                  <YAxis width={0} tick={false} tickLine={false} axisLine={false} domain={[0, "auto"]} />
+                  <Customized component={GridLines} />
                   <Tooltip
                     contentStyle={{
                       background: "var(--color-popover)",
@@ -619,7 +611,7 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
 function ParamRow({ k, v, mono, highlight }: { k: string; v: string; mono?: boolean; highlight?: boolean }) {
   return (
     <div className="flex items-start gap-1.5 px-1.5 py-0.5">
-      <span className="w-12 shrink-0 text-muted-foreground">{k}</span>
+      <span className="w-14 shrink-0 text-muted-foreground">{k}</span>
       <span className={cn("flex-1 break-all", mono && "font-mono text-[9px]", highlight && "text-primary font-medium")}>
         {v}
       </span>

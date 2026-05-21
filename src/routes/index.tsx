@@ -12,12 +12,8 @@ import { DeviceConfigView } from "@/components/DeviceConfigView";
 import { getAuthToken, isAuthenticated } from "@/lib/auth";
 import { fetchDeviceNetwork, fetchDeviceStatus, fetchMyDevices, updateDeviceName, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
 import { notifyRPCReady } from "@/lib/rpc-events";
+import { subscribeDeviceWs, type DeviceWsMessage } from "@/lib/device-ws";
 
-type DeviceWsMessage = {
-  type?: string;
-  payload?: unknown;
-  online?: boolean;
-};
 
 type RPCNoticePayload = {
   requestId?: string;
@@ -26,14 +22,6 @@ type RPCNoticePayload = {
   method?: string;
   timestamp?: string;
 };
-
-function getWsBaseUrl(): string {
-  const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
-  const httpBase = (configured?.trim() || "http://127.0.0.1:18081").replace(/\/$/, "");
-  if (httpBase.startsWith("https://")) return `wss://${httpBase.slice(8)}`;
-  if (httpBase.startsWith("http://")) return `ws://${httpBase.slice(7)}`;
-  return httpBase;
-}
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -46,7 +34,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Dashboard() {
-  const STATUS_FETCH_MIN_INTERVAL_MS = 2000;
+  const STATUS_FETCH_MIN_INTERVAL_MS = 1000;
   const NETWORK_FETCH_MIN_INTERVAL_MS = 1000;
 
   const navigate = useNavigate();
@@ -227,13 +215,8 @@ function Dashboard() {
       }, delay);
     };
 
-    const ws = new WebSocket(
-      `${getWsBaseUrl()}/api/ws/devices/${encodeURIComponent(selectedId)}?token=${encodeURIComponent(token)}`,
-    );
-
-    ws.onmessage = (event) => {
+    const unsubscribeWs = subscribeDeviceWs(selectedId, (msg) => {
       try {
-        const msg = JSON.parse(String(event.data)) as DeviceWsMessage;
         if (msg.type === "rpc.reply") {
           if (msg.payload && typeof msg.payload === "object") {
             const payload = msg.payload as RPCNoticePayload;
@@ -269,11 +252,7 @@ function Dashboard() {
       } catch {
         // Ignore malformed messages and keep current UI state.
       }
-    };
-
-    ws.onerror = () => {
-      setError((prev) => prev || "设备状态实时连接失败");
-    };
+    });
 
     return () => {
       if (statusFetchTimerRef.current != null) {
@@ -284,7 +263,7 @@ function Dashboard() {
         window.clearTimeout(networkFetchTimerRef.current);
         networkFetchTimerRef.current = null;
       }
-      ws.close();
+      unsubscribeWs();
     };
   }, [navigate, selectedId]);
 
