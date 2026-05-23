@@ -15,11 +15,23 @@ interface Connection {
 
 function buildWsUrl(serialNo: string): string {
   const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
-  const httpBase = (configured?.trim() || "http://127.0.0.1:18081").replace(/\/$/, "");
   let wsBase: string;
-  if (httpBase.startsWith("https://")) wsBase = `wss://${httpBase.slice(8)}`;
-  else if (httpBase.startsWith("http://")) wsBase = `ws://${httpBase.slice(7)}`;
-  else wsBase = httpBase;
+  if (configured !== undefined) {
+    const httpBase = configured.trim().replace(/\/$/, "");
+    if (httpBase === "") {
+      // Same-origin: derive WebSocket scheme and host from window.location
+      const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+      wsBase = `${proto}//${window.location.host}`;
+    } else if (httpBase.startsWith("https://")) {
+      wsBase = `wss://${httpBase.slice(8)}`;
+    } else if (httpBase.startsWith("http://")) {
+      wsBase = `ws://${httpBase.slice(7)}`;
+    } else {
+      wsBase = httpBase;
+    }
+  } else {
+    wsBase = "ws://127.0.0.1:18081";
+  }
   const token = getAuthToken() ?? "";
   return `${wsBase}/api/ws/devices/${encodeURIComponent(serialNo)}?token=${encodeURIComponent(token)}`;
 }

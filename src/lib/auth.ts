@@ -14,7 +14,8 @@ const USER_KEY = "vtx-user";
 
 function getApiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
-  return (configured?.trim() || "http://127.0.0.1:18081").replace(/\/$/, "");
+  if (configured !== undefined) return configured.trim().replace(/\/$/, "");
+  return "http://127.0.0.1:18081";
 }
 
 function authHeaders(extra?: HeadersInit): HeadersInit {
