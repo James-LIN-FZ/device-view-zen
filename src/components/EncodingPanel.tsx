@@ -802,7 +802,26 @@ export function EncodingPanel({
     ? `${status.sVideoCodec.iActFPS} fps`
     : "--";
   const audioSource = status?.sAudioParams?.sDevice || "--";
+  const audioParams = (() => {
+    const sr = status?.sAudioCodec?.iSampleRate || status?.sAudioParams?.iSampleRate || 0;
+    const ch = status?.sAudioCodec?.iChannels || status?.sAudioParams?.iChannels || 0;
+    if (!sr && !ch) return "--";
+    const parts: string[] = [];
+    if (sr) parts.push(`${sr}Hz`);
+    if (ch) parts.push(`${ch}ch`);
+    return parts.join(" / ");
+  })();
+  const realtimeRtt = status?.sMuxer?.sSrt?.iMsRTT
+    ? `${status.sMuxer.sSrt.iMsRTT} ms`
+    : "--";
+  const realtimeRetrans = (() => {
+    const sent = status?.sMuxer?.sSrt?.iPktSent || 0;
+    const retrans = status?.sMuxer?.sSrt?.iPktRetrans || 0;
+    if (!sent) return "--";
+    return `${((retrans / sent) * 100).toFixed(2)}%`;
+  })();
   const localRecording = "--";
+
 
   return (
     <section className="panel flex flex-col h-full overflow-hidden">
