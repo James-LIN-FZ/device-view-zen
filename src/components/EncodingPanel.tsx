@@ -1094,11 +1094,12 @@ export function EncodingPanel({
 function Row({ k, v, mono, highlight }: { k: string; v: string; mono?: boolean; highlight?: boolean }) {
   return (
     <div className="flex items-start gap-2 px-2.5 py-1.5">
-      <dt className="w-16 shrink-0 text-muted-foreground">{k}</dt>
-      <dd className={`flex-1 break-all ${mono ? "font-mono text-[10px]" : ""} ${highlight ? "text-primary font-medium" : ""}`}>
+      <span className="w-16 shrink-0 text-muted-foreground">{k}</span>
+      <span className={`flex-1 break-all ${mono ? "font-mono text-[10px]" : ""} ${highlight ? "text-primary font-medium" : ""}`}>
         {v}
-      </dd>
+      </span>
     </div>
+
   );
 }
 
