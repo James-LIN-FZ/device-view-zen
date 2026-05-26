@@ -4,6 +4,8 @@ import { Area, AreaChart, Customized, ResponsiveContainer, Tooltip, XAxis, YAxis
 import { fetchDeviceStatus, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
 import { subscribeDeviceWs } from "@/lib/device-ws";
 import { cn } from "@/lib/utils";
+import { AudioLoudnessMeter } from "@/components/AudioLoudnessMeter";
+
 
 const SLOT_COUNT = 8;
 const POINTS = 30;
@@ -480,7 +482,12 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
               ) : null}
             </>
           )}
+          {/* OBS-style audio loudness meter overlay */}
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-30">
+            <AudioLoudnessMeter active={canShowPreview} />
+          </div>
         </div>
+
 
         {/* Params */}
         <div className="overflow-y-auto border-r border-border text-[10px] divide-y divide-border min-h-0">
