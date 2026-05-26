@@ -143,13 +143,13 @@ export function AudioLoudnessMeter({
   return (
     <div
       className={cn(
-        "pointer-events-none flex h-full select-none items-stretch gap-1 bg-black/55 px-1.5 py-1.5 backdrop-blur-sm",
+        "pointer-events-none flex h-full select-none items-stretch gap-[2px] bg-black/55 px-1 py-1 backdrop-blur-sm",
         className,
       )}
       aria-label="音频响度"
     >
       {/* Scale ticks */}
-      <div className="relative flex w-5 flex-col justify-between text-[8px] font-mono leading-none text-white/70">
+      <div className="relative flex w-3.5 flex-col justify-between text-[7px] font-mono leading-none text-white/70">
         {SCALE_DB.map((db) => (
           <div
             key={db}
