@@ -924,17 +924,25 @@ export function EncodingPanel({
             <Activity className="h-3 w-3 text-primary" />
             <span className="text-[11px] font-medium tracking-wide uppercase">参数详情</span>
           </div>
-          <dl className="divide-y divide-border text-[11px]">
-            <Row k="视频源" v={form.videoSource} />
-            <Row k="视频编码" v={form.videoCodec} />
-            <Row k="音频源" v={audioSource} />
-            <Row k="音频编码" v={form.audioCodec} />
-            <Row k="编码分辨率" v={form.resolution} />
-            <Row k="实时码率" v={realtimeBitrate} highlight />
-            <Row k="实时帧率" v={realtimeFramerate} highlight />
-            <Row k="本地录制" v={localRecording} />
-            <Row k="推流地址" v={form.streamUrl} mono />
-          </dl>
+          <div className="text-[11px]">
+            <div className="grid grid-cols-2 divide-x divide-y divide-border">
+              <Row k="视频源" v={form.videoSource} />
+              <Row k="音频源" v={audioSource} />
+              <Row k="视频编码" v={form.videoCodec} />
+              <Row k="音频编码" v={form.audioCodec} />
+              <Row k="编码分辨率" v={form.resolution} />
+              <Row k="音频参数" v={audioParams} />
+              <Row k="实时码率" v={realtimeBitrate} highlight />
+              <Row k="实时RTT" v={realtimeRtt} highlight />
+              <Row k="实时帧率" v={realtimeFramerate} highlight />
+              <Row k="实时重传率" v={realtimeRetrans} highlight />
+            </div>
+            <div className="divide-y divide-border border-t border-border">
+              <Row k="本地录制" v={localRecording} />
+              <Row k="流地址" v={form.streamUrl} mono />
+            </div>
+          </div>
+
         </div>
 
         {/* Edit Panel */}
