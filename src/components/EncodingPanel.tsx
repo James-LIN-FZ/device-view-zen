@@ -863,8 +863,9 @@ export function EncodingPanel({
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-7 gap-2 p-2 min-h-0">
         {/* Preview */}
-        <div className="lg:col-span-3 flex flex-col min-h-0">
+        <div className="lg:col-span-3 flex flex-row min-h-0 gap-1">
           <div className="group relative flex-1 min-h-0 rounded-sm overflow-hidden border border-border bg-black">
+
             {webrtcOpen ? (
               <>
                 <iframe
@@ -935,13 +936,14 @@ export function EncodingPanel({
                 ) : null}
               </>
             )}
-            {/* OBS-style audio loudness meter overlay on the right edge */}
-            <div className="pointer-events-none absolute inset-y-0 right-0 z-30">
-              <AudioLoudnessMeter active={canShowPreview && !previewLoadFailed} />
-            </div>
           </div>
-
+          {/* OBS-style audio loudness meter — sibling on the right, does not overlay video */}
+          <div className="h-full shrink-0">
+            <AudioLoudnessMeter active={webrtcOpen} />
+          </div>
         </div>
+
+
 
         {/* Params (read-only display) */}
         <div className="lg:col-span-2 min-h-0 overflow-y-auto rounded-sm border border-border bg-card/40">
