@@ -40,6 +40,20 @@ interface ServerStream {
   magic: string;
 }
 
+/** Device info returned by the ubverity activation server (offline fallback). */
+interface UbverityDeviceInfo {
+  sId?: string;
+  sDeviceName?: string;
+  sModel?: string;
+  iGD116?: number;
+  iPreview?: number;
+  sFrpServer?: string;
+  iFrpClientId?: number;
+  sGTHost?: string;
+  sGTPeer?: string;
+  sGTPort?: string;
+}
+
 const SERVER_TYPE_MAP: Partial<Record<string, TaskType>> = {
   SRT_PUSH: "srt",
   RTSP_PUSH: "rtsp",
@@ -140,6 +154,32 @@ export function SmartStreamView({
   async function loadDeviceInfo() {
     if (!device) return;
     if (!device.online) {
+      // Device is offline — try to get static config from ubverity activation server
+      setStatus("loading");
+      try {
+        const token = getAuthToken();
+        const resp = await fetch(
+          `${getApiBaseUrl()}/api/devices/${encodeURIComponent(selectedSn)}/ubverity-info`,
+          { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+        );
+        if (!mountedRef.current) return;
+        if (resp.ok) {
+          const data = (await resp.json()) as UbverityDeviceInfo;
+          const sGTHost = (data.sGTHost ?? "").trim();
+          const parsedPort = parseInt(data.sGTPeer ?? "", 10);
+          const port = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 0;
+          setSmuxHost(sGTHost);
+          setSmuxPort(port);
+          setServerSlots([]);
+          setPipelines((prev) => ({ ...prev, [selectedSn]: emptyPipeline() }));
+          setDraft(emptyPipeline());
+          setStatus("ready");
+          return;
+        }
+      } catch {
+        // fall through to error
+      }
+      if (!mountedRef.current) return;
       setStatus("error");
       return;
     }
