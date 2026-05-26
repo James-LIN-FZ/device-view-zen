@@ -50,6 +50,24 @@ export function AudioLoudnessMeter({
   });
 
   useEffect(() => {
+    // When inactive: reset all values to silence, render once, and do NOT run rAF.
+    if (!active) {
+      const s = state.current;
+      s.l = MIN_DB;
+      s.r = MIN_DB;
+      s.lPeak = MIN_DB;
+      s.rPeak = MIN_DB;
+      s.targetL = MIN_DB;
+      s.targetR = MIN_DB;
+      if (lRef.current) lRef.current.style.height = `0%`;
+      if (rRef.current) rRef.current.style.height = `0%`;
+      if (lPeakRef.current) lPeakRef.current.style.bottom = `0%`;
+      if (rPeakRef.current) rPeakRef.current.style.bottom = `0%`;
+      if (lValRef.current) lValRef.current.textContent = "-∞";
+      if (rValRef.current) rValRef.current.textContent = "-∞";
+      return;
+    }
+
     let raf = 0;
     let last = performance.now();
 
@@ -58,34 +76,23 @@ export function AudioLoudnessMeter({
       last = now;
       const s = state.current;
 
-      if (active) {
-        if (now >= s.nextTargetAt) {
-          // pick new target level with broadcast-like distribution:
-          // mostly green/yellow, occasionally peaking into red.
-          const r = Math.random();
-          let target: number;
-          if (r < 0.7) target = -28 + Math.random() * 12; // -28..-16
-          else if (r < 0.95) target = -16 + Math.random() * 10; // -16..-6
-          else target = -6 + Math.random() * 7; // -6..+1 (occasional clip)
-          s.targetL = target + (Math.random() - 0.5) * 4;
-          s.targetR = target + (Math.random() - 0.5) * 4;
-          s.nextTargetAt = now + 70 + Math.random() * 140;
-        }
-        // smooth attack/release toward target
-        const attack = 0.35;
-        const release = 0.08;
-        const stepL = s.targetL > s.l ? attack : release;
-        const stepR = s.targetR > s.r ? attack : release;
-        s.l += (s.targetL - s.l) * stepL * (dt / 16);
-        s.r += (s.targetR - s.r) * stepR * (dt / 16);
-      } else {
-        s.l += (MIN_DB - s.l) * 0.2;
-        s.r += (MIN_DB - s.r) * 0.2;
-        s.targetL = MIN_DB;
-        s.targetR = MIN_DB;
+      if (now >= s.nextTargetAt) {
+        const r = Math.random();
+        let target: number;
+        if (r < 0.7) target = -28 + Math.random() * 12;
+        else if (r < 0.95) target = -16 + Math.random() * 10;
+        else target = -6 + Math.random() * 7;
+        s.targetL = target + (Math.random() - 0.5) * 4;
+        s.targetR = target + (Math.random() - 0.5) * 4;
+        s.nextTargetAt = now + 70 + Math.random() * 140;
       }
+      const attack = 0.35;
+      const release = 0.08;
+      const stepL = s.targetL > s.l ? attack : release;
+      const stepR = s.targetR > s.r ? attack : release;
+      s.l += (s.targetL - s.l) * stepL * (dt / 16);
+      s.r += (s.targetR - s.r) * stepR * (dt / 16);
 
-      // peak hold (1.2s) + slow fall
       if (s.l > s.lPeak) {
         s.lPeak = s.l;
         s.lPeakAt = now;
@@ -121,6 +128,7 @@ export function AudioLoudnessMeter({
     return () => cancelAnimationFrame(raf);
   }, [active]);
 
+
   // Build the gradient once: green (safe) -> yellow (warn) -> red (danger).
   // CSS percentages go bottom-up because we use bottom alignment.
   const fillGradient = `linear-gradient(to top,
@@ -135,13 +143,13 @@ export function AudioLoudnessMeter({
   return (
     <div
       className={cn(
-        "pointer-events-none flex h-full select-none items-stretch gap-1 bg-black/55 px-1.5 py-1.5 backdrop-blur-sm",
+        "pointer-events-none flex h-full select-none items-stretch gap-[2px] bg-black/55 px-1 py-1 backdrop-blur-sm",
         className,
       )}
       aria-label="音频响度"
     >
       {/* Scale ticks */}
-      <div className="relative flex w-5 flex-col justify-between text-[8px] font-mono leading-none text-white/70">
+      <div className="relative flex w-3.5 flex-col justify-between text-[7px] font-mono leading-none text-white/70">
         {SCALE_DB.map((db) => (
           <div
             key={db}
@@ -194,7 +202,7 @@ function ChannelColumn({
   active: boolean;
 }) {
   return (
-    <div className="flex w-2.5 flex-col items-center gap-0.5">
+    <div className="flex w-2 flex-col items-center gap-0.5">
       <div className="relative h-full w-full overflow-hidden rounded-[2px] border border-white/15 bg-black/80">
         {/* Faint full-range gradient backplate for context */}
         <div
@@ -232,10 +240,10 @@ function ChannelColumn({
           style={{ bottom: "0%" }}
         />
       </div>
-      <div className="text-[8px] font-semibold leading-none text-white/80">{label}</div>
+      <div className="text-[7px] font-semibold leading-none text-white/80">{label}</div>
       <div
         ref={valueRef}
-        className="font-mono text-[8px] leading-none tabular-nums text-white/60"
+        className="font-mono text-[7px] leading-none tabular-nums text-white/60"
       >
         -∞
       </div>
