@@ -944,7 +944,6 @@ export function EncodingPanel({
         </div>
 
 
-        </div>
 
         {/* Params (read-only display) */}
         <div className="lg:col-span-2 min-h-0 overflow-y-auto rounded-sm border border-border bg-card/40">
