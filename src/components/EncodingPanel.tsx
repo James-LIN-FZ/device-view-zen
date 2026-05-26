@@ -955,6 +955,8 @@ export function EncodingPanel({
               <Row k="实时RTT" v={realtimeRtt} highlight />
               <Row k="实时帧率" v={realtimeFramerate} highlight />
               <Row k="实时重传率" v={realtimeRetrans} highlight />
+              <Row k="实时时间" v={realtimeTime} />
+              <Row k="传输质量" v={transmissionQuality} highlight />
             </div>
             <div className="divide-y divide-border border-t border-border">
               <Row k="本地录制" v={localRecording} />
