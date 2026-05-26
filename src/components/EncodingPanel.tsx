@@ -935,7 +935,12 @@ export function EncodingPanel({
                 ) : null}
               </>
             )}
+            {/* OBS-style audio loudness meter overlay on the right edge */}
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-30">
+              <AudioLoudnessMeter active={canShowPreview && !previewLoadFailed} />
+            </div>
           </div>
+
         </div>
 
         {/* Params (read-only display) */}
