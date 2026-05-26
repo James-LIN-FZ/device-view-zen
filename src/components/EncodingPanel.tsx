@@ -802,7 +802,26 @@ export function EncodingPanel({
     ? `${status.sVideoCodec.iActFPS} fps`
     : "--";
   const audioSource = status?.sAudioParams?.sDevice || "--";
+  const audioParams = (() => {
+    const sr = status?.sAudioCodec?.iSampleRate || status?.sAudioParams?.iSampleRate || 0;
+    const ch = status?.sAudioCodec?.iChannels || status?.sAudioParams?.iChannels || 0;
+    if (!sr && !ch) return "--";
+    const parts: string[] = [];
+    if (sr) parts.push(`${sr}Hz`);
+    if (ch) parts.push(`${ch}ch`);
+    return parts.join(" / ");
+  })();
+  const realtimeRtt = status?.sMuxer?.sSrt?.iMsRTT
+    ? `${status.sMuxer.sSrt.iMsRTT} ms`
+    : "--";
+  const realtimeRetrans = (() => {
+    const sent = status?.sMuxer?.sSrt?.iPktSent || 0;
+    const retrans = status?.sMuxer?.sSrt?.iPktRetrans || 0;
+    if (!sent) return "--";
+    return `${((retrans / sent) * 100).toFixed(2)}%`;
+  })();
   const localRecording = "--";
+
 
   return (
     <section className="panel flex flex-col h-full overflow-hidden">
@@ -905,17 +924,25 @@ export function EncodingPanel({
             <Activity className="h-3 w-3 text-primary" />
             <span className="text-[11px] font-medium tracking-wide uppercase">参数详情</span>
           </div>
-          <dl className="divide-y divide-border text-[11px]">
-            <Row k="视频源" v={form.videoSource} />
-            <Row k="视频编码" v={form.videoCodec} />
-            <Row k="音频源" v={audioSource} />
-            <Row k="音频编码" v={form.audioCodec} />
-            <Row k="编码分辨率" v={form.resolution} />
-            <Row k="实时码率" v={realtimeBitrate} highlight />
-            <Row k="实时帧率" v={realtimeFramerate} highlight />
-            <Row k="本地录制" v={localRecording} />
-            <Row k="推流地址" v={form.streamUrl} mono />
-          </dl>
+          <div className="text-[11px]">
+            <div className="grid grid-cols-2 divide-x divide-y divide-border">
+              <Row k="视频源" v={form.videoSource} />
+              <Row k="音频源" v={audioSource} />
+              <Row k="视频编码" v={form.videoCodec} />
+              <Row k="音频编码" v={form.audioCodec} />
+              <Row k="编码分辨率" v={form.resolution} />
+              <Row k="音频参数" v={audioParams} />
+              <Row k="实时码率" v={realtimeBitrate} highlight />
+              <Row k="实时RTT" v={realtimeRtt} highlight />
+              <Row k="实时帧率" v={realtimeFramerate} highlight />
+              <Row k="实时重传率" v={realtimeRetrans} highlight />
+            </div>
+            <div className="divide-y divide-border border-t border-border">
+              <Row k="本地录制" v={localRecording} />
+              <Row k="流地址" v={form.streamUrl} mono />
+            </div>
+          </div>
+
         </div>
 
         {/* Edit Panel */}
@@ -1067,11 +1094,12 @@ export function EncodingPanel({
 function Row({ k, v, mono, highlight }: { k: string; v: string; mono?: boolean; highlight?: boolean }) {
   return (
     <div className="flex items-start gap-2 px-2.5 py-1.5">
-      <dt className="w-16 shrink-0 text-muted-foreground">{k}</dt>
-      <dd className={`flex-1 break-all ${mono ? "font-mono text-[10px]" : ""} ${highlight ? "text-primary font-medium" : ""}`}>
+      <span className="w-16 shrink-0 text-muted-foreground">{k}</span>
+      <span className={`flex-1 break-all ${mono ? "font-mono text-[10px]" : ""} ${highlight ? "text-primary font-medium" : ""}`}>
         {v}
-      </dd>
+      </span>
     </div>
+
   );
 }
 
