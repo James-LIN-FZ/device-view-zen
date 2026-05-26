@@ -504,14 +504,25 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
         </div>
 
         {/* Params */}
-        <div className="overflow-y-auto border-r border-border text-[10px] divide-y divide-border min-h-0">
-          <ParamRow k="视频源" v={videoSource} />
-          <ParamRow k="视频编码" v={videoCodec} />
-          <ParamRow k="音频编码" v={audioCodec} />
-          <ParamRow k="编码分辨率" v={resolution} />
-          <ParamRow k="实时码率" v={actBitrate} highlight />
-          <ParamRow k="实时帧率" v={fps > 0 ? `${fps} fps` : "--"} highlight />
+        <div className="overflow-y-auto border-r border-border text-[10px] min-h-0">
+          <div className="grid grid-cols-2 divide-x divide-y divide-border">
+            <ParamRow k="视频源" v={videoSource} />
+            <ParamRow k="音频源" v={audioSource} />
+            <ParamRow k="视频编码" v={videoCodec} />
+            <ParamRow k="音频编码" v={audioCodec} />
+            <ParamRow k="编码分辨率" v={resolution} />
+            <ParamRow k="音频参数" v={audioParams} />
+            <ParamRow k="实时码率" v={actBitrate} highlight />
+            <ParamRow k="实时RTT" v={realtimeRtt} highlight />
+            <ParamRow k="实时帧率" v={fps > 0 ? `${fps} fps` : "--"} highlight />
+            <ParamRow k="实时重传率" v={realtimeRetrans} highlight />
+          </div>
+          <div className="divide-y divide-border border-t border-border">
+            <ParamRow k="本地录制" v={localRecording} />
+            <ParamRow k="流地址" v={streamUrl} mono />
+          </div>
         </div>
+
 
         {/* Charts: quality (top) + network (bottom) */}
         <div className="flex flex-col min-h-0">
