@@ -240,10 +240,10 @@ function ChannelColumn({
           style={{ bottom: "0%" }}
         />
       </div>
-      <div className="text-[8px] font-semibold leading-none text-white/80">{label}</div>
+      <div className="text-[7px] font-semibold leading-none text-white/80">{label}</div>
       <div
         ref={valueRef}
-        className="font-mono text-[8px] leading-none tabular-nums text-white/60"
+        className="font-mono text-[7px] leading-none tabular-nums text-white/60"
       >
         -∞
       </div>
