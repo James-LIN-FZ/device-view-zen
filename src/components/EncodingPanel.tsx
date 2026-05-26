@@ -414,6 +414,11 @@ export function EncodingPanel({
   const [previewNonce, setPreviewNonce] = useState(0);
   const [previewLoadFailed, setPreviewLoadFailed] = useState(false);
   const [webrtcNonce, setWebrtcNonce] = useState(0);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
   const pendingRequestIdRef = useRef("");
   const recentWSRequestIdRef = useRef("");
   const pollTimerRef = useRef<number | null>(null);
@@ -821,6 +826,20 @@ export function EncodingPanel({
     return `${((retrans / sent) * 100).toFixed(2)}%`;
   })();
   const localRecording = "--";
+  const realtimeTime = online ? new Date(nowTick).toLocaleTimeString() : "--";
+  const transmissionQuality = (() => {
+    if (!online) return "--";
+    const rtt = status?.sMuxer?.sSrt?.iMsRTT || 0;
+    const sent = status?.sMuxer?.sSrt?.iPktSent || 0;
+    const lossPkt = status?.sMuxer?.sSrt?.iPktLoss || 0;
+    const lossRate = sent ? (lossPkt / sent) * 100 : 0;
+    if (lossRate > 5 || rtt > 300) return "差";
+    if (lossRate > 1 || rtt > 150) return "中";
+    if (rtt > 60) return "良";
+    return "优";
+  })();
+
+
 
 
   return (
@@ -936,6 +955,8 @@ export function EncodingPanel({
               <Row k="实时RTT" v={realtimeRtt} highlight />
               <Row k="实时帧率" v={realtimeFramerate} highlight />
               <Row k="实时重传率" v={realtimeRetrans} highlight />
+              <Row k="实时时间" v={realtimeTime} />
+              <Row k="传输质量" v={transmissionQuality} highlight />
             </div>
             <div className="divide-y divide-border border-t border-border">
               <Row k="本地录制" v={localRecording} />

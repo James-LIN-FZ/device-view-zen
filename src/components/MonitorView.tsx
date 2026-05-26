@@ -490,25 +490,6 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
           <ParamRow k="编码分辨率" v={resolution} />
           <ParamRow k="实时码率" v={actBitrate} highlight />
           <ParamRow k="实时帧率" v={fps > 0 ? `${fps} fps` : "--"} highlight />
-          <ParamRow
-            k="实时时间"
-            v={onlineState ? new Date(lastQ.t ?? Date.now()).toLocaleTimeString() : "--"}
-          />
-          <ParamRow
-            k="传输质量"
-            v={
-              onlineState
-                ? lastQ.loss > 5 || lastQ.rtt > 300
-                  ? "差"
-                  : lastQ.loss > 1 || lastQ.rtt > 150
-                    ? "中"
-                    : lastQ.rtt > 60
-                      ? "良"
-                      : "优"
-                : "--"
-            }
-            highlight
-          />
         </div>
 
         {/* Charts: quality (top) + network (bottom) */}
