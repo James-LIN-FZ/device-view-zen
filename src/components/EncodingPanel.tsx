@@ -826,6 +826,20 @@ export function EncodingPanel({
     return `${((retrans / sent) * 100).toFixed(2)}%`;
   })();
   const localRecording = "--";
+  const realtimeTime = online ? new Date(nowTick).toLocaleTimeString() : "--";
+  const transmissionQuality = (() => {
+    if (!online) return "--";
+    const rtt = status?.sMuxer?.sSrt?.iMsRTT || 0;
+    const sent = status?.sMuxer?.sSrt?.iPktSent || 0;
+    const lossPkt = status?.sMuxer?.sSrt?.iPktLoss || 0;
+    const lossRate = sent ? (lossPkt / sent) * 100 : 0;
+    if (lossRate > 5 || rtt > 300) return "差";
+    if (lossRate > 1 || rtt > 150) return "中";
+    if (rtt > 60) return "良";
+    return "优";
+  })();
+
+
 
 
   return (
