@@ -414,6 +414,11 @@ export function EncodingPanel({
   const [previewNonce, setPreviewNonce] = useState(0);
   const [previewLoadFailed, setPreviewLoadFailed] = useState(false);
   const [webrtcNonce, setWebrtcNonce] = useState(0);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
   const pendingRequestIdRef = useRef("");
   const recentWSRequestIdRef = useRef("");
   const pollTimerRef = useRef<number | null>(null);
