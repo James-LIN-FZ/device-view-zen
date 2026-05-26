@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, Video, Settings2, Save, Play, Square, RefreshCw, X } from "lucide-react";
 import { fetchDeviceRPCReply, requestDeviceRPC, type BackendDeviceStatusData } from "@/lib/device-api";
+import { AudioLoudnessMeter } from "@/components/AudioLoudnessMeter";
 
 type EncodeTaskTemplateData = {
   id?: number;
