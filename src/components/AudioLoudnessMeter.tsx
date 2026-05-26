@@ -50,6 +50,24 @@ export function AudioLoudnessMeter({
   });
 
   useEffect(() => {
+    // When inactive: reset all values to silence, render once, and do NOT run rAF.
+    if (!active) {
+      const s = state.current;
+      s.l = MIN_DB;
+      s.r = MIN_DB;
+      s.lPeak = MIN_DB;
+      s.rPeak = MIN_DB;
+      s.targetL = MIN_DB;
+      s.targetR = MIN_DB;
+      if (lRef.current) lRef.current.style.height = `0%`;
+      if (rRef.current) rRef.current.style.height = `0%`;
+      if (lPeakRef.current) lPeakRef.current.style.bottom = `0%`;
+      if (rPeakRef.current) rPeakRef.current.style.bottom = `0%`;
+      if (lValRef.current) lValRef.current.textContent = "-∞";
+      if (rValRef.current) rValRef.current.textContent = "-∞";
+      return;
+    }
+
     let raf = 0;
     let last = performance.now();
 
@@ -58,34 +76,23 @@ export function AudioLoudnessMeter({
       last = now;
       const s = state.current;
 
-      if (active) {
-        if (now >= s.nextTargetAt) {
-          // pick new target level with broadcast-like distribution:
-          // mostly green/yellow, occasionally peaking into red.
-          const r = Math.random();
-          let target: number;
-          if (r < 0.7) target = -28 + Math.random() * 12; // -28..-16
-          else if (r < 0.95) target = -16 + Math.random() * 10; // -16..-6
-          else target = -6 + Math.random() * 7; // -6..+1 (occasional clip)
-          s.targetL = target + (Math.random() - 0.5) * 4;
-          s.targetR = target + (Math.random() - 0.5) * 4;
-          s.nextTargetAt = now + 70 + Math.random() * 140;
-        }
-        // smooth attack/release toward target
-        const attack = 0.35;
-        const release = 0.08;
-        const stepL = s.targetL > s.l ? attack : release;
-        const stepR = s.targetR > s.r ? attack : release;
-        s.l += (s.targetL - s.l) * stepL * (dt / 16);
-        s.r += (s.targetR - s.r) * stepR * (dt / 16);
-      } else {
-        s.l += (MIN_DB - s.l) * 0.2;
-        s.r += (MIN_DB - s.r) * 0.2;
-        s.targetL = MIN_DB;
-        s.targetR = MIN_DB;
+      if (now >= s.nextTargetAt) {
+        const r = Math.random();
+        let target: number;
+        if (r < 0.7) target = -28 + Math.random() * 12;
+        else if (r < 0.95) target = -16 + Math.random() * 10;
+        else target = -6 + Math.random() * 7;
+        s.targetL = target + (Math.random() - 0.5) * 4;
+        s.targetR = target + (Math.random() - 0.5) * 4;
+        s.nextTargetAt = now + 70 + Math.random() * 140;
       }
+      const attack = 0.35;
+      const release = 0.08;
+      const stepL = s.targetL > s.l ? attack : release;
+      const stepR = s.targetR > s.r ? attack : release;
+      s.l += (s.targetL - s.l) * stepL * (dt / 16);
+      s.r += (s.targetR - s.r) * stepR * (dt / 16);
 
-      // peak hold (1.2s) + slow fall
       if (s.l > s.lPeak) {
         s.lPeak = s.l;
         s.lPeakAt = now;
@@ -120,6 +127,7 @@ export function AudioLoudnessMeter({
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [active]);
+
 
   // Build the gradient once: green (safe) -> yellow (warn) -> red (danger).
   // CSS percentages go bottom-up because we use bottom alignment.
