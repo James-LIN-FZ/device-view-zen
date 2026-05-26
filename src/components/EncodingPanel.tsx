@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, Video, Settings2, Save, Play, Square, RefreshCw, X } from "lucide-react";
 import { fetchDeviceRPCReply, requestDeviceRPC, type BackendDeviceStatusData } from "@/lib/device-api";
+import { AudioLoudnessMeter } from "@/components/AudioLoudnessMeter";
 
 type EncodeTaskTemplateData = {
   id?: number;
@@ -934,7 +935,12 @@ export function EncodingPanel({
                 ) : null}
               </>
             )}
+            {/* OBS-style audio loudness meter overlay on the right edge */}
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-30">
+              <AudioLoudnessMeter active={canShowPreview && !previewLoadFailed} />
+            </div>
           </div>
+
         </div>
 
         {/* Params (read-only display) */}
