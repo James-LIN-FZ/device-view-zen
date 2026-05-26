@@ -870,8 +870,9 @@ export function EncodingPanel({
               <>
                 <iframe
                   src={webrtcSrc}
-                  className="absolute inset-0 h-full w-full border-0"
+                  className="absolute inset-0 h-full w-full border-0 overflow-hidden"
                   allow="autoplay; camera; microphone"
+                  scrolling="no"
                   title="WebRTC 预览"
                 />
                 <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
