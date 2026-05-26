@@ -16,7 +16,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const [username, setUsername] = useState("admin");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -88,7 +88,7 @@ function LoginPage() {
           </button>
 
           <p className="text-center text-xs text-muted-foreground pt-2">
-            使用后端账号密码进行登录
+            使用分配的账号密码进行登录
           </p>
         </form>
       </div>
