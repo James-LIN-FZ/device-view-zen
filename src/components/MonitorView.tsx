@@ -4,6 +4,8 @@ import { Area, AreaChart, Customized, ResponsiveContainer, Tooltip, XAxis, YAxis
 import { fetchDeviceStatus, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
 import { subscribeDeviceWs } from "@/lib/device-ws";
 import { cn } from "@/lib/utils";
+import { AudioLoudnessMeter } from "@/components/AudioLoudnessMeter";
+
 
 const SLOT_COUNT = 8;
 const POINTS = 30;
