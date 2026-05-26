@@ -15,18 +15,62 @@ const ZERO_PCT = dbToPct(0);
 const Y6_PCT = dbToPct(-6);
 const Y18_PCT = dbToPct(-18);
 
+// Faint zone-coloured backplate so the user can read the scale even when silent
+const BACKPLATE_GRADIENT = `linear-gradient(to top,
+  rgba(34,197,94,0.12)  0%,
+  rgba(34,197,94,0.12)  ${Y18_PCT.toFixed(1)}%,
+  rgba(234,179,8,0.12)  ${Y18_PCT.toFixed(1)}%,
+  rgba(234,179,8,0.12)  ${Y6_PCT.toFixed(1)}%,
+  rgba(239,68,68,0.15)  ${Y6_PCT.toFixed(1)}%,
+  rgba(239,68,68,0.15)  ${ZERO_PCT.toFixed(1)}%,
+  rgba(220,38,38,0.22)  ${ZERO_PCT.toFixed(1)}%,
+  rgba(220,38,38,0.22)  100%)`;
+
+/**
+ * Returns a CSS background for the fill bar that follows broadcast colour rules:
+ * green (safe) / yellow (warning) / red (danger) / flashing-red (clipping).
+ * Colour boundaries are expressed as percentages *within the fill bar itself*,
+ * so they always land at the correct dB position regardless of bar height.
+ */
+function levelGradient(db: number, now: number): string {
+  const pct = dbToPct(db);
+  if (pct < 0.01) return 'transparent';
+
+  // Where the zone boundaries fall inside this bar (0-100%)
+  const g18 = Math.min(99.9, (Y18_PCT / pct) * 100);
+  const g6  = Math.min(99.9, (Y6_PCT  / pct) * 100);
+  const g0  = Math.min(99.9, (ZERO_PCT / pct) * 100);
+
+  if (db <= -18) {
+    return '#00ff00';
+  }
+  if (db <= -6) {
+    return `linear-gradient(to top,#22c55e 0%,#22c55e ${g18.toFixed(1)}%,#eab308 ${g18.toFixed(1)}%,#eab308 100%)`;
+  }
+  if (db <= 0) {
+    return `linear-gradient(to top,#22c55e 0%,#22c55e ${g18.toFixed(1)}%,#eab308 ${g18.toFixed(1)}%,#eab308 ${g6.toFixed(1)}%,#ef4444 ${g6.toFixed(1)}%,#ef4444 100%)`;
+  }
+  // Clipping: flash the region above 0 dB at ~2.5 Hz
+  const clipColor = Math.floor(now / 200) % 2 === 0 ? '#ff1111' : '#7f0000';
+  return `linear-gradient(to top,#22c55e 0%,#22c55e ${g18.toFixed(1)}%,#eab308 ${g18.toFixed(1)}%,#eab308 ${g6.toFixed(1)}%,#ef4444 ${g6.toFixed(1)}%,#ef4444 ${g0.toFixed(1)}%,${clipColor} ${g0.toFixed(1)}%,${clipColor} 100%)`;
+}
+
 /**
  * Broadcast-style vertical dual-channel loudness meter.
  *
- * Without real PCM access we generate a smooth, plausible level envelope
- * (per-channel RMS + peak hold) driven by requestAnimationFrame so it looks
- * alive when `active` is true and stays at -inf when not.
+ * Receives per-channel dBFS levels via postMessage from the go2rtc stream.html
+ * iframe (which runs the audio analysis inside its same-origin WebRTC connection).
+ * Messages: { type: 'audio-levels', volumeL: number, volumeR: number }
+ *           { type: 'audio-levels-stop' }
  */
 export function AudioLoudnessMeter({
   active,
+  webrtcUrl,
   className,
 }: {
   active: boolean;
+  /** Full go2rtc stream.html URL, e.g. "http://host:port/stream.html?src=540p" */
+  webrtcUrl?: string | null;
   className?: string;
 }) {
   const lRef = useRef<HTMLDivElement | null>(null);
@@ -36,109 +80,66 @@ export function AudioLoudnessMeter({
   const lValRef = useRef<HTMLDivElement | null>(null);
   const rValRef = useRef<HTMLDivElement | null>(null);
 
-  // simulation state
-  const state = useRef({
-    l: MIN_DB,
-    r: MIN_DB,
-    lPeak: MIN_DB,
-    rPeak: MIN_DB,
-    lPeakAt: 0,
-    rPeakAt: 0,
-    targetL: MIN_DB,
-    targetR: MIN_DB,
-    nextTargetAt: 0,
-  });
-
   useEffect(() => {
-    // When inactive: reset all values to silence, render once, and do NOT run rAF.
-    if (!active) {
-      const s = state.current;
-      s.l = MIN_DB;
-      s.r = MIN_DB;
-      s.lPeak = MIN_DB;
-      s.rPeak = MIN_DB;
-      s.targetL = MIN_DB;
-      s.targetR = MIN_DB;
-      if (lRef.current) lRef.current.style.height = `0%`;
-      if (rRef.current) rRef.current.style.height = `0%`;
-      if (lPeakRef.current) lPeakRef.current.style.bottom = `0%`;
-      if (rPeakRef.current) rPeakRef.current.style.bottom = `0%`;
+    const resetMeter = () => {
+      if (lRef.current) lRef.current.style.height = "0%";
+      if (rRef.current) rRef.current.style.height = "0%";
+      if (lPeakRef.current) lPeakRef.current.style.bottom = "0%";
+      if (rPeakRef.current) rPeakRef.current.style.bottom = "0%";
       if (lValRef.current) lValRef.current.textContent = "-∞";
       if (rValRef.current) rValRef.current.textContent = "-∞";
+    };
+
+    if (!active || !webrtcUrl) {
+      resetMeter();
       return;
     }
 
-    let raf = 0;
-    let last = performance.now();
+    let expectedOrigin: string;
+    try {
+      expectedOrigin = new URL(webrtcUrl).origin;
+    } catch {
+      resetMeter();
+      return;
+    }
 
-    const tick = (now: number) => {
-      const dt = Math.min(64, now - last);
-      last = now;
-      const s = state.current;
+    const peakL = { val: MIN_DB, at: 0 };
+    const peakR = { val: MIN_DB, at: 0 };
 
-      if (now >= s.nextTargetAt) {
-        const r = Math.random();
-        let target: number;
-        if (r < 0.7) target = -28 + Math.random() * 12;
-        else if (r < 0.95) target = -16 + Math.random() * 10;
-        else target = -6 + Math.random() * 7;
-        s.targetL = target + (Math.random() - 0.5) * 4;
-        s.targetR = target + (Math.random() - 0.5) * 4;
-        s.nextTargetAt = now + 70 + Math.random() * 140;
-      }
-      const attack = 0.35;
-      const release = 0.08;
-      const stepL = s.targetL > s.l ? attack : release;
-      const stepR = s.targetR > s.r ? attack : release;
-      s.l += (s.targetL - s.l) * stepL * (dt / 16);
-      s.r += (s.targetR - s.r) * stepR * (dt / 16);
+    const pushFrame = (dbL: number, dbR: number, now: number) => {
+      if (dbL > peakL.val) { peakL.val = dbL; peakL.at = now; }
+      else if (now - peakL.at > 1200) peakL.val -= 0.12;
+      if (dbR > peakR.val) { peakR.val = dbR; peakR.at = now; }
+      else if (now - peakR.at > 1200) peakR.val -= 0.12;
+      if (peakL.val < dbL) peakL.val = dbL;
+      if (peakR.val < dbR) peakR.val = dbR;
 
-      if (s.l > s.lPeak) {
-        s.lPeak = s.l;
-        s.lPeakAt = now;
-      } else if (now - s.lPeakAt > 1200) {
-        s.lPeak -= 0.12 * (dt / 16);
-      }
-      if (s.r > s.rPeak) {
-        s.rPeak = s.r;
-        s.rPeakAt = now;
-      } else if (now - s.rPeakAt > 1200) {
-        s.rPeak -= 0.12 * (dt / 16);
-      }
-      if (s.lPeak < s.l) s.lPeak = s.l;
-      if (s.rPeak < s.r) s.rPeak = s.r;
-
-      const lPct = dbToPct(s.l);
-      const rPct = dbToPct(s.r);
-      const lPeakPct = dbToPct(s.lPeak);
-      const rPeakPct = dbToPct(s.rPeak);
-
-      if (lRef.current) lRef.current.style.height = `${lPct}%`;
-      if (rRef.current) rRef.current.style.height = `${rPct}%`;
-      if (lPeakRef.current) lPeakRef.current.style.bottom = `${lPeakPct}%`;
-      if (rPeakRef.current) rPeakRef.current.style.bottom = `${rPeakPct}%`;
-      if (lValRef.current)
-        lValRef.current.textContent = s.l <= MIN_DB + 0.5 ? "-∞" : s.l.toFixed(0);
-      if (rValRef.current)
-        rValRef.current.textContent = s.r <= MIN_DB + 0.5 ? "-∞" : s.r.toFixed(0);
-
-      raf = requestAnimationFrame(tick);
+      if (lRef.current) lRef.current.style.height = `${dbToPct(dbL)}%`;
+      if (lRef.current) lRef.current.style.background = levelGradient(dbL, now);
+      if (rRef.current) rRef.current.style.height = `${dbToPct(dbR)}%`;
+      if (rRef.current) rRef.current.style.background = levelGradient(dbR, now);
+      if (lPeakRef.current) lPeakRef.current.style.bottom = `${dbToPct(peakL.val)}%`;
+      if (rPeakRef.current) rPeakRef.current.style.bottom = `${dbToPct(peakR.val)}%`;
+      if (lValRef.current) lValRef.current.textContent = dbL <= MIN_DB + 0.5 ? "-∞" : dbL.toFixed(0);
+      if (rValRef.current) rValRef.current.textContent = dbR <= MIN_DB + 0.5 ? "-∞" : dbR.toFixed(0);
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [active]);
 
+    const handler = (event: MessageEvent) => {
+      if (event.origin !== expectedOrigin) return;
+      const data = event.data as { type: string; volumeL?: number; volumeR?: number } | null;
+      if (!data) return;
+      if (data.type === 'audio-levels-stop') { resetMeter(); return; }
+      if (data.type !== 'audio-levels') return;
+      pushFrame(data.volumeL ?? MIN_DB, data.volumeR ?? MIN_DB, performance.now());
+    };
 
-  // Build the gradient once: green (safe) -> yellow (warn) -> red (danger).
-  // CSS percentages go bottom-up because we use bottom alignment.
-  const fillGradient = `linear-gradient(to top,
-    #16a34a 0%,
-    #22c55e ${Y18_PCT - 0.5}%,
-    #eab308 ${Y18_PCT}%,
-    #facc15 ${Y6_PCT - 0.5}%,
-    #ef4444 ${Y6_PCT}%,
-    #dc2626 ${ZERO_PCT}%,
-    #b91c1c 100%)`;
+    window.addEventListener('message', handler);
+
+    return () => {
+      window.removeEventListener('message', handler);
+      resetMeter();
+    };
+  }, [active, webrtcUrl]);
 
   return (
     <div
@@ -149,7 +150,7 @@ export function AudioLoudnessMeter({
       aria-label="音频响度"
     >
       {/* Scale ticks */}
-      <div className="relative flex w-3.5 flex-col justify-between text-[7px] font-mono leading-none text-white/70">
+      <div className="relative flex w-4 flex-col justify-between text-[9px] font-mono leading-none text-white/70">
         {SCALE_DB.map((db) => (
           <div
             key={db}
@@ -169,8 +170,6 @@ export function AudioLoudnessMeter({
         label="L"
         fillRef={lRef}
         peakRef={lPeakRef}
-        valueRef={lValRef}
-        fillGradient={fillGradient}
         active={active}
       />
       {/* Channel R */}
@@ -178,8 +177,6 @@ export function AudioLoudnessMeter({
         label="R"
         fillRef={rRef}
         peakRef={rPeakRef}
-        valueRef={rValRef}
-        fillGradient={fillGradient}
         active={active}
       />
     </div>
@@ -190,34 +187,28 @@ function ChannelColumn({
   label,
   fillRef,
   peakRef,
-  valueRef,
-  fillGradient,
   active,
 }: {
   label: string;
   fillRef: React.RefObject<HTMLDivElement | null>;
   peakRef: React.RefObject<HTMLDivElement | null>;
-  valueRef: React.RefObject<HTMLDivElement | null>;
-  fillGradient: string;
   active: boolean;
 }) {
   return (
     <div className="flex w-2 flex-col items-center gap-0.5">
       <div className="relative h-full w-full overflow-hidden rounded-[2px] border border-white/15 bg-black/80">
-        {/* Faint full-range gradient backplate for context */}
+        {/* Zone-coloured backplate: faint colour bands show safe/warn/danger at a glance */}
         <div
-          className="absolute inset-0 opacity-15"
-          style={{ background: fillGradient }}
+          className="absolute inset-0"
+          style={{ background: BACKPLATE_GRADIENT }}
         />
-        {/* Active fill (bottom-anchored) */}
+        {/* Active fill (bottom-anchored); height + background set per-frame via ref */}
         <div
           ref={fillRef}
-          className="absolute bottom-0 left-0 right-0 will-change-[height]"
+          className="absolute bottom-0 left-0 right-0 will-change-[height,background]"
           style={{
             height: "0%",
-            background: fillGradient,
-            transition: "height 60ms linear",
-            boxShadow: active ? "0 0 6px rgba(239, 68, 68, 0.25) inset" : undefined,
+            boxShadow: active ? "0 0 4px rgba(255,255,255,0.15) inset" : undefined,
           }}
         />
         {/* Tick marks overlay (-6, -18 reference lines) */}
@@ -240,13 +231,7 @@ function ChannelColumn({
           style={{ bottom: "0%" }}
         />
       </div>
-      <div className="text-[7px] font-semibold leading-none text-white/80">{label}</div>
-      <div
-        ref={valueRef}
-        className="font-mono text-[7px] leading-none tabular-nums text-white/60"
-      >
-        -∞
-      </div>
+      <div className="text-[9px] font-semibold leading-none text-white/80">{label}</div>
     </div>
   );
 }

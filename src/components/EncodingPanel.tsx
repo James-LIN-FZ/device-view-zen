@@ -940,7 +940,7 @@ export function EncodingPanel({
           </div>
           {/* OBS-style audio loudness meter — sibling on the right, does not overlay video */}
           <div className="h-full shrink-0">
-            <AudioLoudnessMeter active={webrtcOpen} />
+            <AudioLoudnessMeter active={webrtcOpen} webrtcUrl={webrtcBaseUrl} />
           </div>
         </div>
 
