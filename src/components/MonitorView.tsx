@@ -482,7 +482,12 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
               ) : null}
             </>
           )}
+          {/* OBS-style audio loudness meter overlay */}
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-30">
+            <AudioLoudnessMeter active={canShowPreview} />
+          </div>
         </div>
+
 
         {/* Params */}
         <div className="overflow-y-auto border-r border-border text-[10px] divide-y divide-border min-h-0">
