@@ -202,7 +202,7 @@ function ChannelColumn({
   active: boolean;
 }) {
   return (
-    <div className="flex w-2.5 flex-col items-center gap-0.5">
+    <div className="flex w-2 flex-col items-center gap-0.5">
       <div className="relative h-full w-full overflow-hidden rounded-[2px] border border-white/15 bg-black/80">
         {/* Faint full-range gradient backplate for context */}
         <div
