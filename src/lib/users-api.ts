@@ -46,7 +46,7 @@ function delay<T>(value: T, ms = 200): Promise<T> {
 function getApiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
   if (configured !== undefined) return configured.trim().replace(/\/$/, "");
-  return "http://127.0.0.1:18081";
+  return "http://192.168.3.253:8089";
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

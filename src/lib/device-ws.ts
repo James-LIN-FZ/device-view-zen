@@ -30,7 +30,7 @@ function buildWsUrl(serialNo: string): string {
       wsBase = httpBase;
     }
   } else {
-    wsBase = "ws://127.0.0.1:18081";
+    wsBase = "ws://192.168.3.253:8089";
   }
   const token = getAuthToken() ?? "";
   return `${wsBase}/api/ws/devices/${encodeURIComponent(serialNo)}?token=${encodeURIComponent(token)}`;
