@@ -484,7 +484,7 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
           )}
           {/* OBS-style audio loudness meter overlay */}
           <div className="pointer-events-none absolute inset-y-0 right-0 z-30">
-            <AudioLoudnessMeter active={canShowPreview} />
+            <AudioLoudnessMeter active={webrtcOpen} webrtcUrl={webrtcBaseUrl} />
           </div>
         </div>
 
