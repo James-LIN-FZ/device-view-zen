@@ -507,29 +507,40 @@ export function SmartStreamView({
 
             <div className="flex flex-col gap-2">
               {/* Fixed: SRT Server */}
-              <FixedNode
-                icon={<Video className="h-4 w-4" />}
-                title="SRT Server"
-                detail={srtPull}
-                copied={copiedKey === "srt-server"}
-                taskStatus={taskProgresses["loopback"]}
-                onClick={() => {
-                  setSelectedNode("srt-server");
-                  copyToClipboard("srt-server", srtPull);
-                }}
-              />
+              <div className="flex items-center gap-2">
+                <FixedNode
+                  icon={<Video className="h-4 w-4" />}
+                  title="SRT Server"
+                  detail={srtPull}
+                  copied={copiedKey === "srt-server"}
+                  onClick={() => {
+                    setSelectedNode("srt-server");
+                    copyToClipboard("srt-server", srtPull);
+                  }}
+                />
+                <TaskStatusTag
+                  prog={taskProgresses["loopback"]}
+                  running={taskProgresses["loopback"]?.progress === "continue"}
+                />
+              </div>
               {/* Fixed: RTSP Server */}
-              <FixedNode
-                icon={<Video className="h-4 w-4" />}
-                title="RTSP Server"
-                detail={rtspPull}
-                copied={copiedKey === "rtsp-server"}
-                taskStatus={taskProgresses["loopback"]}
-                onClick={() => {
-                  setSelectedNode("rtsp-server");
-                  copyToClipboard("rtsp-server", rtspPull);
-                }}
-              />
+              <div className="flex items-center gap-2">
+                <FixedNode
+                  icon={<Video className="h-4 w-4" />}
+                  title="RTSP Server"
+                  detail={rtspPull}
+                  copied={copiedKey === "rtsp-server"}
+                  onClick={() => {
+                    setSelectedNode("rtsp-server");
+                    copyToClipboard("rtsp-server", rtspPull);
+                  }}
+                />
+                <TaskStatusTag
+                  prog={taskProgresses["loopback"]}
+                  running={taskProgresses["loopback"]?.progress === "continue"}
+                />
+              </div>
+
 
               {/* Editable slots */}
               {draft.slots.map((slot, i) => {
