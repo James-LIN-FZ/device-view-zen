@@ -764,14 +764,12 @@ function FixedNode({
   title,
   detail,
   copied,
-  taskStatus,
   onClick,
 }: {
   icon: React.ReactNode;
   title: string;
   detail: string;
   copied?: boolean;
-  taskStatus?: TaskProgressData;
   onClick?: () => void;
 }) {
   return (
@@ -780,7 +778,7 @@ function FixedNode({
       onClick={onClick}
       title="点击复制拉流地址"
       className={cn(
-        "flex items-center gap-2 rounded-md border-2 bg-card/60 px-3 py-2 min-w-[260px] text-left transition-colors",
+        "flex items-center gap-2 rounded-md border-2 bg-card/60 px-3 py-2 min-w-[260px] flex-1 text-left transition-colors",
         copied
           ? "border-primary bg-primary/15"
           : "border-primary/50 hover:border-primary",
@@ -790,14 +788,6 @@ function FixedNode({
       <div className="min-w-0 flex-1">
         <div className="text-[12px] font-medium leading-tight">{title}</div>
         <div className="text-[11px] text-muted-foreground truncate font-mono">{detail}</div>
-        {taskStatus && taskStatus.progress === "continue" && (
-          <div className="mt-0.5 flex items-center gap-2 text-[10px] text-emerald-400/90 font-mono">
-            <span>{taskStatus.outTime.slice(0, 8)}</span>
-            <span>{taskStatus.fps.toFixed(1)}fps</span>
-            <span>{taskStatus.frame}帧</span>
-            <span>丢帧:{taskStatus.dropFrames}</span>
-          </div>
-        )}
       </div>
       {copied ? (
         <Check className="h-3.5 w-3.5 text-primary shrink-0" />
