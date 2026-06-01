@@ -537,121 +537,113 @@ export function SmartStreamView({
                 const isEditing = editingSlot === i;
                 if (slot) {
                   const { Icon, label } = PUSH_META[slot.type];
+                  const slotKey = String(i + 1);
+                  const prog = taskProgresses[slotKey];
+                  const running = !!prog && prog.progress === "continue";
                   return (
-                    <div
-                      key={i}
-                      className={cn(
-                        "group flex items-center justify-between gap-2 rounded-md border-2 bg-card/60 px-3 py-2 min-w-[260px] transition-colors",
-                        selectedNode === `slot-${i}`
-                          ? "border-primary bg-primary/10"
-                          : "border-primary/50 hover:border-primary",
-                      )}
-                      onClick={() => !isEditing && setSelectedNode(`slot-${i}`)}
-                    >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <Icon className="h-4 w-4 text-primary shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[12px] font-medium leading-tight">{label}</div>
-                          {!isPushType(slot.type) ? (
-                            <div className="text-[11px] text-muted-foreground italic">已启用</div>
-                          ) : isEditing ? (
-                            <div className="mt-1 space-y-1" onClick={(e) => e.stopPropagation()}>
-                              <input
-                                autoFocus
-                                value={editingUrl}
-                                placeholder={PUSH_META[slot.type].placeholder}
-                                onChange={(e) => setEditingUrl(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" && slot.type !== "srt") {
-                                    e.preventDefault();
-                                    commitEdit();
-                                  }
-                                  if (e.key === "Escape") {
-                                    e.preventDefault();
-                                    cancelEdit();
-                                  }
-                                }}
-                                onBlur={slot.type === "srt" ? undefined : commitEdit}
-                                className="w-full rounded-sm border border-primary/50 bg-background px-1.5 py-0.5 text-[11px] outline-none"
-                              />
-                              {slot.type === "srt" && (
-                                <div className="flex items-center gap-1.5">
-                                  <label className="text-[10px] text-muted-foreground shrink-0">延迟</label>
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    value={editingLatency}
-                                    placeholder="120"
-                                    onChange={(e) => setEditingLatency(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") {
-                                        e.preventDefault();
-                                        commitEdit();
-                                      }
-                                      if (e.key === "Escape") {
-                                        e.preventDefault();
-                                        cancelEdit();
-                                      }
-                                    }}
-                                    onBlur={commitEdit}
-                                    className="w-20 rounded-sm border border-primary/50 bg-background px-1.5 py-0.5 text-[11px] outline-none"
-                                  />
-                                  <span className="text-[10px] text-muted-foreground">ms</span>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              className="text-[11px] text-muted-foreground truncate text-left w-full hover:text-primary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingSlot(i);
-                                setEditingUrl(slot.url);
-                                setEditingLatency(slot.latencyMs?.toString() ?? "120");
-                                setSelectedNode(`slot-${i}`);
-                              }}
-                              title="点击编辑推流地址"
-                            >
-                              {slot.url ? (
-                                <span className="font-mono">
-                                  {slot.url}
-                                  {slot.type === "srt" && slot.latencyMs != null && (
-                                    <span className="ml-1 text-primary/80">· {slot.latencyMs}ms</span>
-                                  )}
-                                </span>
-                              ) : (
-                                <span className="italic">未设置 · 点击编辑</span>
-                              )}
-                            </button>
-                          )}
-                          {(() => {
-                            const slotKey = String(i + 1);
-                            const prog = taskProgresses[slotKey];
-                            if (!prog || prog.progress !== "continue") return null;
-                            return (
-                              <div className="mt-0.5 flex items-center gap-2 text-[10px] text-emerald-400/90 font-mono">
-                                <span>{prog.outTime.slice(0, 8)}</span>
-                                <span>{prog.fps.toFixed(1)}fps</span>
-                                <span>{prog.frame}帧</span>
-                                <span>丢帧:{prog.dropFrames}</span>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeSlot(i);
-                        }}
-                        className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition"
-                        title="删除"
-                        aria-label="删除推流"
+                    <div key={i} className="flex items-center gap-2">
+                      <div
+                        className={cn(
+                          "group flex items-center justify-between gap-2 rounded-md border-2 bg-card/60 px-3 py-2 min-w-[260px] transition-colors flex-1",
+                          selectedNode === `slot-${i}`
+                            ? "border-primary bg-primary/10"
+                            : "border-primary/50 hover:border-primary",
+                        )}
+                        onClick={() => !isEditing && setSelectedNode(`slot-${i}`)}
                       >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <Icon className="h-4 w-4 text-primary shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[12px] font-medium leading-tight">{label}</div>
+                            {!isPushType(slot.type) ? (
+                              <div className="text-[11px] text-muted-foreground italic">已启用</div>
+                            ) : isEditing ? (
+                              <div className="mt-1 space-y-1" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  autoFocus
+                                  value={editingUrl}
+                                  placeholder={PUSH_META[slot.type].placeholder}
+                                  onChange={(e) => setEditingUrl(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" && slot.type !== "srt") {
+                                      e.preventDefault();
+                                      commitEdit();
+                                    }
+                                    if (e.key === "Escape") {
+                                      e.preventDefault();
+                                      cancelEdit();
+                                    }
+                                  }}
+                                  onBlur={slot.type === "srt" ? undefined : commitEdit}
+                                  className="w-full rounded-sm border border-primary/50 bg-background px-1.5 py-0.5 text-[11px] outline-none"
+                                />
+                                {slot.type === "srt" && (
+                                  <div className="flex items-center gap-1.5">
+                                    <label className="text-[10px] text-muted-foreground shrink-0">延迟</label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={editingLatency}
+                                      placeholder="120"
+                                      onChange={(e) => setEditingLatency(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          e.preventDefault();
+                                          commitEdit();
+                                        }
+                                        if (e.key === "Escape") {
+                                          e.preventDefault();
+                                          cancelEdit();
+                                        }
+                                      }}
+                                      onBlur={commitEdit}
+                                      className="w-20 rounded-sm border border-primary/50 bg-background px-1.5 py-0.5 text-[11px] outline-none"
+                                    />
+                                    <span className="text-[10px] text-muted-foreground">ms</span>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                className="text-[11px] text-muted-foreground truncate text-left w-full hover:text-primary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingSlot(i);
+                                  setEditingUrl(slot.url);
+                                  setEditingLatency(slot.latencyMs?.toString() ?? "120");
+                                  setSelectedNode(`slot-${i}`);
+                                }}
+                                title="点击编辑推流地址"
+                              >
+                                {slot.url ? (
+                                  <span className="font-mono">
+                                    {slot.url}
+                                    {slot.type === "srt" && slot.latencyMs != null && (
+                                      <span className="ml-1 text-primary/80">· {slot.latencyMs}ms</span>
+                                    )}
+                                  </span>
+                                ) : (
+                                  <span className="italic">未设置 · 点击编辑</span>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeSlot(i);
+                          }}
+                          className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition"
+                          title="删除"
+                          aria-label="删除推流"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <TaskStatusTag prog={prog} running={running} />
                     </div>
                   );
                 }
@@ -686,6 +678,40 @@ export function SmartStreamView({
         )}
       </div>
     </section>
+  );
+}
+
+function TaskStatusTag({
+  prog,
+  running,
+}: {
+  prog?: TaskProgressData;
+  running: boolean;
+}) {
+  if (!prog || !running) {
+    return (
+      <div
+        className="shrink-0 rounded-md border border-border bg-muted/30 px-2 py-1 text-[10px] text-muted-foreground min-w-[120px] flex items-center gap-1.5"
+        title="任务未运行"
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+        <span>未运行</span>
+      </div>
+    );
+  }
+  return (
+    <div
+      className="shrink-0 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-[10px] font-mono text-emerald-400 min-w-[120px]"
+      title="实时状态"
+    >
+      <div className="flex items-center gap-1.5 mb-0.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        <span className="font-sans">运行中</span>
+      </div>
+      <div className="leading-tight">{prog.outTime.slice(0, 8)}</div>
+      <div className="leading-tight">{prog.fps.toFixed(1)}fps · {prog.frame}帧</div>
+      <div className="leading-tight">丢帧:{prog.dropFrames}</div>
+    </div>
   );
 }
 
