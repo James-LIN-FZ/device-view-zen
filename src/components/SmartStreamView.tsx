@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { rpcCall, getApiBaseUrl, type BackendDevice } from "@/lib/device-api";
 import { getAuthToken } from "@/lib/auth";
 import { PanelStatusView, type PanelLoadStatus } from "@/components/PanelStatus";
+import { subscribeDeviceWs } from "@/lib/device-ws";
 
 export type PushType = "srt" | "rtsp" | "rtmp";
 export type AiTaskType = "ai_enhance" | "smart_hd" | "cloud_record";
@@ -38,6 +39,15 @@ interface ServerStream {
   type: string;     // e.g. "RTSP_PUSH", "SRT_PUSH", "RTMP_PUSH"
   push_url: string;
   magic: string;
+}
+
+/** Task real-time progress pushed via server_pub MQTT topic and exposed by HTTP. */
+interface TaskProgressData {
+  frame: number;
+  fps: number;
+  dropFrames: number;
+  outTime: string;
+  progress: string;
 }
 
 /** Device info returned by the ubverity activation server (offline fallback). */
@@ -114,6 +124,7 @@ export function SmartStreamView({
   const [smuxHost, setSmuxHost] = useState("");
   const [smuxPort, setSmuxPort] = useState(0);
   const [serverSlots, setServerSlots] = useState<ServerStream[]>([]);
+  const [taskProgresses, setTaskProgresses] = useState<Record<string, TaskProgressData>>({});
 
   const device = useMemo(
     () => devices.find((d) => d.serialNo === selectedSn) ?? null,
@@ -146,10 +157,42 @@ export function SmartStreamView({
     setDraft(pipelines[selectedSn] ?? emptyPipeline());
     setSelectedNode(null);
     setEditingSlot(null);
+    setTaskProgresses({});
     if (!selectedSn) return;
     void loadDeviceInfo();
+    void loadTaskProgress();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSn, device?.online]);
+
+  // Subscribe to WebSocket for real-time task progress updates
+  useEffect(() => {
+    if (!selectedSn) return;
+    return subscribeDeviceWs(selectedSn, (msg) => {
+      if (typeof msg.type === "string" && msg.type.startsWith("task_progress:")) {
+        const key = msg.type.slice("task_progress:".length);
+        if (msg.payload && typeof msg.payload === "object") {
+          setTaskProgresses((prev) => ({ ...prev, [key]: msg.payload as TaskProgressData }));
+        }
+      }
+    });
+  }, [selectedSn]);
+
+  async function loadTaskProgress() {
+    if (!selectedSn) return;
+    const token = getAuthToken();
+    try {
+      const resp = await fetch(
+        `${getApiBaseUrl()}/api/devices/${encodeURIComponent(selectedSn)}/task-progress`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+      );
+      if (resp.ok && mountedRef.current) {
+        const data = (await resp.json()) as Record<string, TaskProgressData>;
+        setTaskProgresses(data);
+      }
+    } catch {
+      // ignore — status will be populated via WebSocket
+    }
+  }
 
   async function loadDeviceInfo() {
     if (!device) return;
@@ -469,6 +512,7 @@ export function SmartStreamView({
                 title="SRT Server"
                 detail={srtPull}
                 copied={copiedKey === "srt-server"}
+                taskStatus={taskProgresses["loopback"]}
                 onClick={() => {
                   setSelectedNode("srt-server");
                   copyToClipboard("srt-server", srtPull);
@@ -480,6 +524,7 @@ export function SmartStreamView({
                 title="RTSP Server"
                 detail={rtspPull}
                 copied={copiedKey === "rtsp-server"}
+                taskStatus={taskProgresses["loopback"]}
                 onClick={() => {
                   setSelectedNode("rtsp-server");
                   copyToClipboard("rtsp-server", rtspPull);
@@ -580,6 +625,19 @@ export function SmartStreamView({
                               )}
                             </button>
                           )}
+                          {(() => {
+                            const slotKey = String(i + 1);
+                            const prog = taskProgresses[slotKey];
+                            if (!prog || prog.progress !== "continue") return null;
+                            return (
+                              <div className="mt-0.5 flex items-center gap-2 text-[10px] text-emerald-400/90 font-mono">
+                                <span>{prog.outTime.slice(0, 8)}</span>
+                                <span>{prog.fps.toFixed(1)}fps</span>
+                                <span>{prog.frame}帧</span>
+                                <span>丢帧:{prog.dropFrames}</span>
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                       <button
@@ -678,12 +736,14 @@ function FixedNode({
   title,
   detail,
   copied,
+  taskStatus,
   onClick,
 }: {
   icon: React.ReactNode;
   title: string;
   detail: string;
   copied?: boolean;
+  taskStatus?: TaskProgressData;
   onClick?: () => void;
 }) {
   return (
@@ -702,6 +762,14 @@ function FixedNode({
       <div className="min-w-0 flex-1">
         <div className="text-[12px] font-medium leading-tight">{title}</div>
         <div className="text-[11px] text-muted-foreground truncate font-mono">{detail}</div>
+        {taskStatus && taskStatus.progress === "continue" && (
+          <div className="mt-0.5 flex items-center gap-2 text-[10px] text-emerald-400/90 font-mono">
+            <span>{taskStatus.outTime.slice(0, 8)}</span>
+            <span>{taskStatus.fps.toFixed(1)}fps</span>
+            <span>{taskStatus.frame}帧</span>
+            <span>丢帧:{taskStatus.dropFrames}</span>
+          </div>
+        )}
       </div>
       {copied ? (
         <Check className="h-3.5 w-3.5 text-primary shrink-0" />
