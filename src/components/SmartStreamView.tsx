@@ -681,6 +681,40 @@ export function SmartStreamView({
   );
 }
 
+function TaskStatusTag({
+  prog,
+  running,
+}: {
+  prog?: TaskProgressData;
+  running: boolean;
+}) {
+  if (!prog || !running) {
+    return (
+      <div
+        className="shrink-0 rounded-md border border-border bg-muted/30 px-2 py-1 text-[10px] text-muted-foreground min-w-[120px] flex items-center gap-1.5"
+        title="任务未运行"
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+        <span>未运行</span>
+      </div>
+    );
+  }
+  return (
+    <div
+      className="shrink-0 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-[10px] font-mono text-emerald-400 min-w-[120px]"
+      title="实时状态"
+    >
+      <div className="flex items-center gap-1.5 mb-0.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        <span className="font-sans">运行中</span>
+      </div>
+      <div className="leading-tight">{prog.outTime.slice(0, 8)}</div>
+      <div className="leading-tight">{prog.fps.toFixed(1)}fps · {prog.frame}帧</div>
+      <div className="leading-tight">丢帧:{prog.dropFrames}</div>
+    </div>
+  );
+}
+
 function PipelineNode({
   icon,
   title,
