@@ -699,17 +699,8 @@ function TaskStatusTag({
   prog?: TaskProgressData;
   running: boolean;
 }) {
-  if (!prog || !running) {
-    return (
-      <div
-        className="shrink-0 rounded-md border border-border bg-muted/30 px-2 py-1 text-[10px] text-muted-foreground min-w-[120px] flex items-center gap-1.5"
-        title="任务未运行"
-      >
-        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
-        <span>未运行</span>
-      </div>
-    );
-  }
+  if (!prog || !running) return null;
+
   return (
     <div
       className="shrink-0 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-[10px] font-mono text-emerald-400 min-w-[120px]"
