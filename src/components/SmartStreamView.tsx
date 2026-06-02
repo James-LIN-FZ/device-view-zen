@@ -553,10 +553,10 @@ export function SmartStreamView({
                   const prog = taskProgresses[slotKey];
                   const running = !!prog && prog.progress === "continue";
                   return (
-                    <div key={i} className="flex items-center gap-2">
+                    <div key={i} className="relative">
                       <div
                         className={cn(
-                          "group flex items-center justify-between gap-2 rounded-md border-2 bg-card/60 px-3 py-2 min-w-[260px] transition-colors flex-1",
+                          "group flex items-center justify-between gap-2 rounded-md border-2 bg-card/60 px-3 py-2 min-w-[260px] transition-colors",
                           selectedNode === `slot-${i}`
                             ? "border-primary bg-primary/10"
                             : "border-primary/50 hover:border-primary",
