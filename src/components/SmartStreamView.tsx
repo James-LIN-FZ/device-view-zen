@@ -507,7 +507,7 @@ export function SmartStreamView({
 
             <div className="flex flex-col gap-2">
               {/* Fixed: SRT Server */}
-              <div className="flex items-center gap-2">
+              <div className="relative">
                 <FixedNode
                   icon={<Video className="h-4 w-4" />}
                   title="SRT Server"
@@ -524,7 +524,7 @@ export function SmartStreamView({
                 />
               </div>
               {/* Fixed: RTSP Server */}
-              <div className="flex items-center gap-2">
+              <div className="relative">
                 <FixedNode
                   icon={<Video className="h-4 w-4" />}
                   title="RTSP Server"
@@ -542,6 +542,7 @@ export function SmartStreamView({
               </div>
 
 
+
               {/* Editable slots */}
               {draft.slots.map((slot, i) => {
                 const isHover = hoverSlot === i;
@@ -552,10 +553,10 @@ export function SmartStreamView({
                   const prog = taskProgresses[slotKey];
                   const running = !!prog && prog.progress === "continue";
                   return (
-                    <div key={i} className="flex items-center gap-2">
+                    <div key={i} className="relative">
                       <div
                         className={cn(
-                          "group flex items-center justify-between gap-2 rounded-md border-2 bg-card/60 px-3 py-2 min-w-[260px] transition-colors flex-1",
+                          "group flex items-center justify-between gap-2 rounded-md border-2 bg-card/60 px-3 py-2 min-w-[260px] transition-colors",
                           selectedNode === `slot-${i}`
                             ? "border-primary bg-primary/10"
                             : "border-primary/50 hover:border-primary",
@@ -703,16 +704,12 @@ function TaskStatusTag({
 
   return (
     <div
-      className="shrink-0 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-[10px] font-mono text-emerald-400 min-w-[120px]"
+      className="absolute left-full top-0 bottom-0 ml-2 flex flex-col justify-center rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-[10px] font-mono text-emerald-400 whitespace-nowrap"
       title="实时状态"
     >
-      <div className="flex items-center gap-1.5 mb-0.5">
-        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-        <span className="font-sans">运行中</span>
-      </div>
-      <div className="leading-tight">{prog.outTime.slice(0, 8)}</div>
-      <div className="leading-tight">{prog.fps.toFixed(1)}fps · {prog.frame}帧</div>
-      <div className="leading-tight">丢帧:{prog.dropFrames}</div>
+      <div className="leading-tight">运行时长：{prog.outTime.slice(0, 8)}</div>
+      <div className="leading-tight">实时帧率：{prog.fps.toFixed(1)} fps</div>
+      <div className="leading-tight">帧数：{prog.frame} · 丢帧：{prog.dropFrames}</div>
     </div>
   );
 }
