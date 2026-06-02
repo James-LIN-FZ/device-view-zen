@@ -507,7 +507,7 @@ export function SmartStreamView({
 
             <div className="flex flex-col gap-2">
               {/* Fixed: SRT Server */}
-              <div className="flex items-center gap-2">
+              <div className="relative">
                 <FixedNode
                   icon={<Video className="h-4 w-4" />}
                   title="SRT Server"
@@ -524,7 +524,7 @@ export function SmartStreamView({
                 />
               </div>
               {/* Fixed: RTSP Server */}
-              <div className="flex items-center gap-2">
+              <div className="relative">
                 <FixedNode
                   icon={<Video className="h-4 w-4" />}
                   title="RTSP Server"
@@ -540,6 +540,7 @@ export function SmartStreamView({
                   running={taskProgresses["loopback"]?.progress === "continue"}
                 />
               </div>
+
 
 
               {/* Editable slots */}
