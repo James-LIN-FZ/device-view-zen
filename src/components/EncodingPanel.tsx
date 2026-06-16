@@ -355,7 +355,7 @@ function getPreviewBaseUrl(streamUrl: string): string | null {
     const srtPort = Number(parsed.port);
     if (!Number.isFinite(srtPort) || srtPort < 15000 || srtPort > 15099) return null;
     const previewPort = 19000 + (srtPort - 15000);
-    return `http://${parsed.hostname}:${previewPort}/api/frame.jpeg?src=main`;
+    return `http://${parsed.hostname}:${previewPort}/api/frame.jpeg?src=540p`;
   } catch {
     return null;
   }
