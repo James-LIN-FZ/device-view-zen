@@ -458,7 +458,7 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
                   type="button"
                   onClick={() => setWebrtcOpen(true)}
                   className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/0 opacity-0 transition group-hover:pointer-events-auto group-hover:bg-black/20 group-hover:opacity-100"
-                  title={`播放 WebRTC：${webrtcBaseUrl}`}
+                  title={`播放`}
                 >
                   <span className="inline-flex items-center justify-center rounded-full border border-primary/70 bg-black/65 p-2 text-primary shadow-sm">
                     <Play className="h-4 w-4" />

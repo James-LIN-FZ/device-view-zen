@@ -279,9 +279,9 @@ function normalizeVideoCodec(value?: string): string {
 function normalizeAudioCodec(value?: string): string {
   if (!value) return "--";
   const upper = value.toUpperCase();
-  if (upper.includes("AAC")) return "AAC-LC 48kHz";
-  if (upper.includes("OPUS")) return "Opus 48kHz";
-  if (upper.includes("MP3")) return "MP3 44.1kHz";
+  if (upper.includes("AAC")) return "AAC-LC";
+  if (upper.includes("OPUS")) return "Opus";
+  if (upper.includes("MP3")) return "MP3";
   return value;
 }
 

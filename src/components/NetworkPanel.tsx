@@ -12,6 +12,7 @@ import {
 
 const CHART_COLOR = "var(--color-primary)";
 const GRID_COLOR = "var(--color-grid-line)";
+const DATA_STALE_MS = 3000;
 
 const POINTS = 30;
 const DISPLAY_NIC_COUNT = 8;
@@ -133,6 +134,7 @@ export function NetworkPanel({ serialNo, online, payload }: { serialNo: string; 
     Array.from({ length: DISPLAY_NIC_COUNT }, () => makeInitial()),
   );
   const latestRef = useRef<NicRealtime[]>(displayNics);
+  const lastDataAtRef = useRef<number>(Date.now());
 
   useEffect(() => {
     setOnlineState(online);
@@ -142,6 +144,7 @@ export function NetworkPanel({ serialNo, online, payload }: { serialNo: string; 
   useEffect(() => {
     setLiveNics([]);
     setSeries(Array.from({ length: DISPLAY_NIC_COUNT }, () => makeInitial()));
+    lastDataAtRef.current = Date.now();
   }, [serialNo]);
 
   useEffect(() => {
@@ -149,16 +152,18 @@ export function NetworkPanel({ serialNo, online, payload }: { serialNo: string; 
   }, [displayNics]);
 
   useEffect(() => {
+    lastDataAtRef.current = Date.now();
     setLiveNics(parseNetworkPayload(payload));
   }, [payload]);
 
   useEffect(() => {
     const id = setInterval(() => {
+      const hasRecentData = Date.now() - lastDataAtRef.current < DATA_STALE_MS;
       setSeries((prev) =>
         prev.map((arr, i) => {
           const nic = latestRef.current[i];
-          const up = onlineState ? Math.max(0, nic?.up || 0) : 0;
-          const down = onlineState ? Math.max(0, nic?.down || 0) : 0;
+          const up = onlineState && hasRecentData ? Math.max(0, nic?.up || 0) : 0;
+          const down = onlineState && hasRecentData ? Math.max(0, nic?.down || 0) : 0;
           const next = arr.slice(1);
           next.push({ t: Date.now(), up: +up.toFixed(2), down: +down.toFixed(2) });
           return next;
