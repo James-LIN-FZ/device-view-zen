@@ -125,9 +125,36 @@ function getWebrtcBaseUrl(streamUrl: string): string | null {
   }
 }
 
+const SLOTS_STORAGE_KEY = "vtx-monitor-slots";
+
+function loadStoredSlots(): (string | null)[] {
+  try {
+    const raw = sessionStorage.getItem(SLOTS_STORAGE_KEY);
+    if (!raw) return Array(SLOT_COUNT).fill(null);
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return Array(SLOT_COUNT).fill(null);
+    const next = Array<string | null>(SLOT_COUNT).fill(null);
+    for (let i = 0; i < SLOT_COUNT; i++) {
+      const v = parsed[i];
+      next[i] = typeof v === "string" && v ? v : null;
+    }
+    return next;
+  } catch {
+    return Array(SLOT_COUNT).fill(null);
+  }
+}
+
 export function MonitorView({ devices }: { devices: BackendDevice[] }) {
-  const [slots, setSlots] = useState<(string | null)[]>(() => Array(SLOT_COUNT).fill(null));
+  const [slots, setSlots] = useState<(string | null)[]>(() => loadStoredSlots());
   const [hoverSlot, setHoverSlot] = useState<number | null>(null);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SLOTS_STORAGE_KEY, JSON.stringify(slots));
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [slots]);
 
   const deviceMap = useMemo(() => {
     const map = new Map<string, BackendDevice>();
