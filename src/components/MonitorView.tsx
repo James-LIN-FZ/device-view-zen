@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, MonitorPlay, RefreshCw, Play } from "lucide-react";
+import { X, MonitorPlay, RefreshCw, Play, Maximize, Minimize } from "lucide-react";
 import { Area, AreaChart, Customized, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { fetchDeviceStatus, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
 import { subscribeDeviceWs } from "@/lib/device-ws";
