@@ -7,7 +7,14 @@ import { cn } from "@/lib/utils";
 import { AudioLoudnessMeter } from "@/components/AudioLoudnessMeter";
 
 
-const SLOT_COUNT = 8;
+type MonitorMode = "status" | "grid3" | "grid4";
+
+const MODE_CONFIG: Record<MonitorMode, { slots: number; gridClass: string; label: string }> = {
+  status: { slots: 8, gridClass: "grid-cols-2 grid-rows-4", label: "状态监看" },
+  grid3: { slots: 9, gridClass: "grid-cols-3 grid-rows-3", label: "3 × 3 播放" },
+  grid4: { slots: 16, gridClass: "grid-cols-4 grid-rows-4", label: "4 × 4 播放" },
+};
+
 const POINTS = 30;
 const CHART_COLOR = "var(--color-primary)";
 const GRID_COLOR = "rgba(120, 120, 140, 0.3)";
@@ -125,36 +132,76 @@ function getWebrtcBaseUrl(streamUrl: string): string | null {
   }
 }
 
-const SLOTS_STORAGE_KEY = "vtx-monitor-slots";
+const SLOTS_STORAGE_KEY = "vtx-monitor-slots-v2";
+const MODE_STORAGE_KEY = "vtx-monitor-mode";
 
-function loadStoredSlots(): (string | null)[] {
+type SlotsByMode = Record<MonitorMode, (string | null)[]>;
+
+function emptySlotsForMode(mode: MonitorMode): (string | null)[] {
+  return Array(MODE_CONFIG[mode].slots).fill(null);
+}
+
+function emptySlotsAll(): SlotsByMode {
+  return {
+    status: emptySlotsForMode("status"),
+    grid3: emptySlotsForMode("grid3"),
+    grid4: emptySlotsForMode("grid4"),
+  };
+}
+
+function loadStoredSlots(): SlotsByMode {
   try {
     const raw = sessionStorage.getItem(SLOTS_STORAGE_KEY);
-    if (!raw) return Array(SLOT_COUNT).fill(null);
+    if (!raw) return emptySlotsAll();
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return Array(SLOT_COUNT).fill(null);
-    const next = Array<string | null>(SLOT_COUNT).fill(null);
-    for (let i = 0; i < SLOT_COUNT; i++) {
-      const v = parsed[i];
-      next[i] = typeof v === "string" && v ? v : null;
-    }
-    return next;
+    if (!parsed || typeof parsed !== "object") return emptySlotsAll();
+    const all = emptySlotsAll();
+    (Object.keys(all) as MonitorMode[]).forEach((mode) => {
+      const arr = (parsed as Record<string, unknown>)[mode];
+      if (Array.isArray(arr)) {
+        const count = MODE_CONFIG[mode].slots;
+        for (let i = 0; i < count; i++) {
+          const v = arr[i];
+          all[mode][i] = typeof v === "string" && v ? v : null;
+        }
+      }
+    });
+    return all;
   } catch {
-    return Array(SLOT_COUNT).fill(null);
+    return emptySlotsAll();
   }
 }
 
+function loadStoredMode(): MonitorMode {
+  try {
+    const raw = sessionStorage.getItem(MODE_STORAGE_KEY);
+    if (raw === "status" || raw === "grid3" || raw === "grid4") return raw;
+  } catch {
+    // ignore
+  }
+  return "status";
+}
+
 export function MonitorView({ devices }: { devices: BackendDevice[] }) {
-  const [slots, setSlots] = useState<(string | null)[]>(() => loadStoredSlots());
+  const [mode, setMode] = useState<MonitorMode>(() => loadStoredMode());
+  const [slotsByMode, setSlotsByMode] = useState<SlotsByMode>(() => loadStoredSlots());
   const [hoverSlot, setHoverSlot] = useState<number | null>(null);
 
   useEffect(() => {
     try {
-      sessionStorage.setItem(SLOTS_STORAGE_KEY, JSON.stringify(slots));
+      sessionStorage.setItem(SLOTS_STORAGE_KEY, JSON.stringify(slotsByMode));
     } catch {
       // Ignore storage failures.
     }
-  }, [slots]);
+  }, [slotsByMode]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(MODE_STORAGE_KEY, mode);
+    } catch {
+      // ignore
+    }
+  }, [mode]);
 
   const deviceMap = useMemo(() => {
     const map = new Map<string, BackendDevice>();
@@ -162,13 +209,19 @@ export function MonitorView({ devices }: { devices: BackendDevice[] }) {
     return map;
   }, [devices]);
 
+  const slots = slotsByMode[mode];
+  const config = MODE_CONFIG[mode];
+
+  const updateSlots = (updater: (prev: (string | null)[]) => (string | null)[]) => {
+    setSlotsByMode((prev) => ({ ...prev, [mode]: updater(prev[mode]) }));
+  };
+
   const handleDrop = (index: number, e: React.DragEvent) => {
     e.preventDefault();
     const sn = e.dataTransfer.getData("application/x-device-sn") || e.dataTransfer.getData("text/plain");
     if (!sn) return;
-    setSlots((prev) => {
+    updateSlots((prev) => {
       const next = [...prev];
-      // If already placed elsewhere, remove from old slot
       const oldIdx = next.indexOf(sn);
       if (oldIdx >= 0) next[oldIdx] = null;
       next[index] = sn;
@@ -177,23 +230,42 @@ export function MonitorView({ devices }: { devices: BackendDevice[] }) {
     setHoverSlot(null);
   };
 
+  const videoOnly = mode !== "status";
+
   return (
     <section className="panel flex flex-col h-full overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-border flex items-center justify-between">
+      <div className="px-4 py-2.5 border-b border-border flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <MonitorPlay className="h-4 w-4 text-primary" />
           <h2 className="text-sm font-semibold tracking-wide">监看面板</h2>
         </div>
+        <div className="flex items-center gap-1 rounded-md border border-border bg-card/40 p-0.5">
+          {(Object.keys(MODE_CONFIG) as MonitorMode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={cn(
+                "px-2.5 py-1 text-[11px] rounded transition-colors cursor-pointer",
+                m === mode
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary",
+              )}
+            >
+              {MODE_CONFIG[m].label}
+            </button>
+          ))}
+        </div>
         <span className="text-[11px] text-muted-foreground">
-          从左侧设备列表拖拽设备到监看位 · {slots.filter(Boolean).length} / {SLOT_COUNT}
+          {slots.filter(Boolean).length} / {config.slots}
         </span>
       </div>
-      <div className="flex-1 grid grid-cols-2 grid-rows-4 gap-2 p-2 min-h-0">
+      <div className={cn("flex-1 grid gap-2 p-2 min-h-0", config.gridClass)}>
         {slots.map((sn, i) => {
           const device = sn ? deviceMap.get(sn) ?? null : null;
           return (
             <div
-              key={i}
+              key={`${mode}-${i}`}
               onDragOver={(e) => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = "copy";
@@ -213,8 +285,9 @@ export function MonitorView({ devices }: { devices: BackendDevice[] }) {
               {device ? (
                 <MonitorTile
                   device={device}
+                  videoOnly={videoOnly}
                   onRemove={() =>
-                    setSlots((prev) => {
+                    updateSlots((prev) => {
                       const next = [...prev];
                       next[i] = null;
                       return next;
@@ -259,7 +332,15 @@ function GridLines(props: Record<string, unknown>) {
   );
 }
 
-function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: () => void }) {
+function MonitorTile({
+  device,
+  onRemove,
+  videoOnly = false,
+}: {
+  device: BackendDevice;
+  onRemove: () => void;
+  videoOnly?: boolean;
+}) {
   const fallbackCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [status, setStatus] = useState<BackendDeviceStatusData | null>(null);
   const [onlineState, setOnlineState] = useState(device.online);
@@ -276,7 +357,6 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
     setOnlineState(device.online);
   }, [device.online]);
 
-  // Status fetch + WS (codec/presence events trigger immediate re-fetch; 5s poll as fallback)
   useEffect(() => {
     let active = true;
     const load = () => {
@@ -307,8 +387,8 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
     };
   }, [device.serialNo]);
 
-  // Sampler
   useEffect(() => {
+    if (videoOnly) return;
     const id = setInterval(() => {
       const now = Date.now();
       setSeries((prev) => {
@@ -325,7 +405,7 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [onlineState]);
+  }, [onlineState, videoOnly]);
 
   const streamUrl = status?.sMuxer?.sURL || "--";
   const noSignal = onlineState ? isNoSignal(status) : true;
@@ -350,7 +430,6 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
     setWebrtcNonce(0);
   }, [previewBaseUrl, onlineState, noSignal]);
 
-  // Draw a 360p RGB fallback frame for offline / no-signal states.
   useEffect(() => {
     if (canShowPreview && !previewLoadFailed) return;
     const canvas = fallbackCanvasRef.current;
@@ -407,7 +486,116 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
   const fps = status?.sVideoCodec?.iActFPS || status?.sVideoCodec?.iFPS || status?.sVideoParams?.iFPS || 0;
   const actBitrate = status?.sVideoCodec?.sActBitrate || status?.sVideoCodec?.sBitrate || "--";
   const videoSource = status?.sVideoParams?.sDevice || "--";
-  
+
+  const previewBlock = (
+    <div className="group relative bg-black min-h-0 overflow-hidden h-full w-full">
+      {webrtcOpen ? (
+        <>
+          <iframe
+            src={webrtcSrc}
+            className="absolute inset-0 h-full w-full border-0"
+            allow="autoplay; camera; microphone"
+            title="WebRTC 监看"
+            scrolling="no"
+          />
+          <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+            <button
+              type="button"
+              onClick={() => setWebrtcNonce((v) => v + 1)}
+              className="inline-flex items-center justify-center rounded-sm border border-border/60 bg-black/70 p-1 text-muted-foreground hover:text-foreground transition"
+              title="刷新播放"
+              aria-label="刷新播放"
+            >
+              <RefreshCw className="h-3 w-3" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setWebrtcOpen(false)}
+              className="inline-flex items-center justify-center rounded-sm border border-border/60 bg-black/70 p-1 text-muted-foreground hover:text-foreground transition"
+              title="关闭预览"
+              aria-label="关闭预览"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          {canShowPreview && !previewLoadFailed ? (
+            <img
+              src={previewSrc}
+              alt="设备预览图"
+              className="h-full w-full object-cover"
+              onError={() => setPreviewLoadFailed(true)}
+            />
+          ) : (
+            <canvas ref={fallbackCanvasRef} width={640} height={360} className="h-full w-full object-cover" />
+          )}
+          {canPlayWebrtc ? (
+            <button
+              type="button"
+              onClick={() => setWebrtcOpen(true)}
+              className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/0 opacity-0 transition group-hover:pointer-events-auto group-hover:bg-black/20 group-hover:opacity-100"
+              title={`播放 WebRTC：${webrtcBaseUrl}`}
+            >
+              <span className="inline-flex items-center justify-center rounded-full border border-primary/70 bg-black/65 p-2 text-primary shadow-sm">
+                <Play className="h-4 w-4" />
+              </span>
+            </button>
+          ) : null}
+          {canShowPreview ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPreviewLoadFailed(false);
+                setPreviewNonce((v) => v + 1);
+              }}
+              className="absolute top-1.5 right-1.5 z-20 inline-flex items-center justify-center rounded-sm border border-border/60 bg-black/70 p-1 text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-foreground"
+              title="刷新预览图"
+              aria-label="刷新预览图"
+            >
+              <RefreshCw className="h-3 w-3" />
+            </button>
+          ) : null}
+        </>
+      )}
+      {!videoOnly ? (
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-30">
+          <AudioLoudnessMeter active={webrtcOpen} webrtcUrl={webrtcBaseUrl} />
+        </div>
+      ) : null}
+    </div>
+  );
+
+  if (videoOnly) {
+    return (
+      <div className="relative h-full w-full min-h-0 group">
+        {previewBlock}
+        <div className="pointer-events-none absolute top-1 left-1 right-8 z-20 flex items-center gap-1.5 opacity-0 transition group-hover:opacity-100">
+          <span
+            className={cn(
+              "h-1.5 w-1.5 rounded-full shrink-0",
+              onlineState ? "bg-[var(--color-success)]" : "bg-muted-foreground",
+            )}
+          />
+          <span className="text-[11px] font-medium text-white truncate drop-shadow">
+            {device.name?.trim() || "未命名设备"}
+          </span>
+          <span className="text-[10px] text-white/70 truncate drop-shadow">· {device.serialNo}</span>
+        </div>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="absolute top-1 right-1 z-20 rounded-sm bg-black/60 p-0.5 text-white/80 opacity-0 transition group-hover:opacity-100 hover:text-destructive"
+          title="移除"
+          aria-label="移除"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -436,85 +624,7 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
 
       {/* Body: preview left, params + chart right */}
       <div className="flex-1 grid grid-cols-[40%_30%_30%] min-h-0">
-        {/* Preview */}
-        <div className="group relative bg-black border-r border-border min-h-0 overflow-hidden">
-          {webrtcOpen ? (
-            <>
-              <iframe
-                src={webrtcSrc}
-                className="absolute inset-0 h-full w-full border-0"
-                allow="autoplay; camera; microphone"
-                title="WebRTC 监看"
-                scrolling="no"
-              />
-              <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
-                <button
-                  type="button"
-                  onClick={() => setWebrtcNonce((v) => v + 1)}
-                  className="inline-flex items-center justify-center rounded-sm border border-border/60 bg-black/70 p-1 text-muted-foreground hover:text-foreground transition"
-                  title="刷新播放"
-                  aria-label="刷新播放"
-                >
-                  <RefreshCw className="h-3 w-3" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWebrtcOpen(false)}
-                  className="inline-flex items-center justify-center rounded-sm border border-border/60 bg-black/70 p-1 text-muted-foreground hover:text-foreground transition"
-                  title="关闭预览"
-                  aria-label="关闭预览"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              {canShowPreview && !previewLoadFailed ? (
-                <img
-                  src={previewSrc}
-                  alt="设备预览图"
-                  className="h-full w-full object-cover"
-                  onError={() => setPreviewLoadFailed(true)}
-                />
-              ) : (
-                <canvas ref={fallbackCanvasRef} width={640} height={360} className="h-full w-full object-cover" />
-              )}
-              {canPlayWebrtc ? (
-                <button
-                  type="button"
-                  onClick={() => setWebrtcOpen(true)}
-                  className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/0 opacity-0 transition group-hover:pointer-events-auto group-hover:bg-black/20 group-hover:opacity-100"
-                  title={`播放 WebRTC：${webrtcBaseUrl}`}
-                >
-                  <span className="inline-flex items-center justify-center rounded-full border border-primary/70 bg-black/65 p-2 text-primary shadow-sm">
-                    <Play className="h-4 w-4" />
-                  </span>
-                </button>
-              ) : null}
-              {canShowPreview ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPreviewLoadFailed(false);
-                    setPreviewNonce((v) => v + 1);
-                  }}
-                  className="absolute top-1.5 right-1.5 z-20 inline-flex items-center justify-center rounded-sm border border-border/60 bg-black/70 p-1 text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-foreground"
-                  title="刷新预览图"
-                  aria-label="刷新预览图"
-                >
-                  <RefreshCw className="h-3 w-3" />
-                </button>
-              ) : null}
-            </>
-          )}
-          {/* OBS-style audio loudness meter overlay */}
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-30">
-            <AudioLoudnessMeter active={webrtcOpen} webrtcUrl={webrtcBaseUrl} />
-          </div>
-        </div>
-
+        <div className="border-r border-border min-h-0 overflow-hidden">{previewBlock}</div>
 
         {/* Params */}
         <div className="overflow-y-auto border-r border-border text-[10px] divide-y divide-border min-h-0">
@@ -528,7 +638,6 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
 
         {/* Charts: quality (top) + network (bottom) */}
         <div className="flex flex-col min-h-0">
-          {/* Quality chart */}
           <div className="flex flex-col min-h-0 flex-1 border-b border-border">
             <div className="px-2 py-1 border-b border-border flex items-center justify-between text-[10px]">
               <span className="text-muted-foreground">传输质量</span>
@@ -583,7 +692,6 @@ function MonitorTile({ device, onRemove }: { device: BackendDevice; onRemove: ()
             </div>
           </div>
 
-          {/* Network chart */}
           <div className="flex flex-col min-h-0 flex-1">
             <div className="px-2 py-1 border-b border-border flex items-center justify-between text-[10px]">
               <span className="text-muted-foreground">网络</span>
