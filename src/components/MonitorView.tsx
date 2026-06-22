@@ -285,8 +285,9 @@ export function MonitorView({ devices }: { devices: BackendDevice[] }) {
             type="button"
             onClick={toggleFullscreen}
             title={isFullscreen ? "退出全屏" : "全屏显示"}
-            className="inline-flex items-center justify-center rounded-md border border-border bg-card/40 p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground cursor-pointer"
+            className="inline-flex items-center justify-center gap-1.5 rounded-md border border-border bg-card/40 px-2.5 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground cursor-pointer"
           >
+            <span>全屏显示</span>
             {isFullscreen ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}
           </button>
           <span className="text-[11px] text-muted-foreground">
