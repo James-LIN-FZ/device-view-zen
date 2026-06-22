@@ -183,9 +183,33 @@ function loadStoredMode(): MonitorMode {
 }
 
 export function MonitorView({ devices }: { devices: BackendDevice[] }) {
+  const panelRef = useRef<HTMLElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [mode, setMode] = useState<MonitorMode>(() => loadStoredMode());
   const [slotsByMode, setSlotsByMode] = useState<SlotsByMode>(() => loadStoredSlots());
   const [hoverSlot, setHoverSlot] = useState<number | null>(null);
+
+  useEffect(() => {
+    const onChange = () => {
+      setIsFullscreen(document.fullscreenElement === panelRef.current);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    const el = panelRef.current;
+    if (!el) return;
+    try {
+      if (!document.fullscreenElement) {
+        await el.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // Ignore fullscreen errors.
+    }
+  };
 
   useEffect(() => {
     try {
