@@ -257,7 +257,7 @@ export function MonitorView({ devices }: { devices: BackendDevice[] }) {
   const videoOnly = mode !== "status";
 
   return (
-    <section ref={panelRef} className="panel flex flex-col h-full overflow-hidden">
+    <section ref={panelRef} className="panel flex flex-col h-full w-full overflow-hidden">
       <div className="px-4 py-2.5 border-b border-border flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <MonitorPlay className="h-4 w-4 text-primary" />
