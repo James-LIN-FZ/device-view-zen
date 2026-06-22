@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, MonitorPlay, RefreshCw, Play } from "lucide-react";
+import { X, MonitorPlay, RefreshCw, Play, Maximize, Minimize } from "lucide-react";
 import { Area, AreaChart, Customized, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { fetchDeviceStatus, type BackendDevice, type BackendDeviceStatusData } from "@/lib/device-api";
 import { subscribeDeviceWs } from "@/lib/device-ws";
@@ -183,9 +183,33 @@ function loadStoredMode(): MonitorMode {
 }
 
 export function MonitorView({ devices }: { devices: BackendDevice[] }) {
+  const panelRef = useRef<HTMLElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [mode, setMode] = useState<MonitorMode>(() => loadStoredMode());
   const [slotsByMode, setSlotsByMode] = useState<SlotsByMode>(() => loadStoredSlots());
   const [hoverSlot, setHoverSlot] = useState<number | null>(null);
+
+  useEffect(() => {
+    const onChange = () => {
+      setIsFullscreen(document.fullscreenElement === panelRef.current);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    const el = panelRef.current;
+    if (!el) return;
+    try {
+      if (!document.fullscreenElement) {
+        await el.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // Ignore fullscreen errors.
+    }
+  };
 
   useEffect(() => {
     try {
@@ -233,7 +257,7 @@ export function MonitorView({ devices }: { devices: BackendDevice[] }) {
   const videoOnly = mode !== "status";
 
   return (
-    <section className="panel flex flex-col h-full overflow-hidden">
+    <section ref={panelRef} className="panel flex flex-col h-full w-full overflow-hidden">
       <div className="px-4 py-2.5 border-b border-border flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <MonitorPlay className="h-4 w-4 text-primary" />
@@ -256,9 +280,19 @@ export function MonitorView({ devices }: { devices: BackendDevice[] }) {
             </button>
           ))}
         </div>
-        <span className="text-[11px] text-muted-foreground">
-          {slots.filter(Boolean).length} / {config.slots}
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            title={isFullscreen ? "退出全屏" : "全屏显示"}
+            className="inline-flex items-center justify-center rounded-md border border-border bg-card/40 p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground cursor-pointer"
+          >
+            {isFullscreen ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}
+          </button>
+          <span className="text-[11px] text-muted-foreground">
+            {slots.filter(Boolean).length} / {config.slots}
+          </span>
+        </div>
       </div>
       <div className={cn("flex-1 grid gap-2 p-2 min-h-0", config.gridClass)}>
         {slots.map((sn, i) => {
