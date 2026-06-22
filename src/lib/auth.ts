@@ -77,6 +77,8 @@ export function clearAuth(): void {
     sessionStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(USER_KEY);
     sessionStorage.removeItem("vtx-monitor-slots");
+    sessionStorage.removeItem("vtx-monitor-slots-v2");
+    sessionStorage.removeItem("vtx-monitor-mode");
   } catch {
     // Ignore storage failures and keep app behavior stable.
   }
