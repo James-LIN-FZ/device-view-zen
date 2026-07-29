@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Network } from "lucide-react";
+import { Network, Signal, Wifi } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -18,7 +18,17 @@ const POINTS = 30;
 const DISPLAY_NIC_COUNT = 8;
 
 type Sample = { t: number; up: number; down: number };
-type NicRealtime = { name: string; type: string; up: number; down: number };
+type NicRealtime = {
+  name: string;
+  type: string;
+  up: number;
+  down: number;
+  isWireless: boolean;
+  isWifi: boolean;
+  signal: string;
+  isp: string;
+  netMode: string; // "5G" | "4G" | "Wi-Fi" | ""
+};
 
 function makeInitial(): Sample[] {
   const now = Date.now();
@@ -115,14 +125,35 @@ function parseNetworkPayload(payload: unknown): NicRealtime[] {
       const downText = parseSpeedTextToKbps(stats.sRxSpeed);
       const up = upText ?? toKbps(upNum || 0);
       const down = downText ?? toKbps(downNum || 0);
-      return { name, type, up, down };
+
+      const linkType = pickString(link, ["sType", "type"]).toLowerCase();
+      const isWifi = /^wlan/i.test(name) || linkType === "wifi" || linkType === "wlan";
+      const isEth = linkType === "ethernet" || /^eth/i.test(name);
+      const isWireless = !isEth;
+
+      const modem = asRecord(row.modem) || {};
+      const signal = pickString(modem, ["sSignal", "signal", "rssi"]);
+      const isp = pickString(modem, ["sISP", "isp", "operator", "carrier"]);
+      const modeRaw = pickString(modem, ["sMode", "mode", "netMode", "rat"]).toUpperCase();
+
+      let netMode = "";
+      if (isWifi) {
+        netMode = "Wi-Fi";
+      } else if (isWireless) {
+        if (/NR/.test(modeRaw)) netMode = /LTE/.test(modeRaw) ? "5G/4G" : "5G";
+        else if (/LTE|4G/.test(modeRaw)) netMode = "4G";
+        else if (/3G|WCDMA|HSPA/.test(modeRaw)) netMode = "3G";
+        else if (modeRaw) netMode = modeRaw;
+      }
+
+      return { name, type, up, down, isWireless, isWifi, signal, isp, netMode };
     })
     .filter((item): item is NicRealtime => item !== null);
 }
 
 function makeDisplayNics(liveNics: NicRealtime[]): NicRealtime[] {
   return Array.from({ length: DISPLAY_NIC_COUNT }, (_, i) =>
-    liveNics[i] ?? { name: "--", type: "--", up: 0, down: 0 },
+    liveNics[i] ?? { name: "--", type: "--", up: 0, down: 0, isWireless: false, isWifi: false, signal: "", isp: "", netMode: "" },
   );
 }
 
@@ -194,12 +225,33 @@ export function NetworkPanel({ serialNo, online, payload }: { serialNo: string; 
               key={`${nic.name}-${i}`}
               className="rounded-md border border-border bg-card/40 px-1 py-1 flex flex-col min-h-0"
             >
-              <div className="flex items-center justify-between mb-1 px-1">
-                <div className="min-w-0">
+              <div className="flex items-center justify-between mb-1 px-1 gap-1">
+                <div className="min-w-0 flex-1">
                   <div className={`text-xs font-semibold tracking-wide truncate ${isEmpty ? "text-muted-foreground" : ""}`}>
                     {nic.name}
                   </div>
-                  <div className={`text-[10px] truncate ${isEmpty ? "text-muted-foreground" : "text-muted-foreground"}`}>{nic.type}</div>
+                  <div className={`text-[10px] truncate text-muted-foreground`}>{nic.type}</div>
+                  {!isEmpty && nic.isWireless ? (
+                    <div className="mt-0.5 flex items-center gap-1 flex-wrap">
+                      {nic.netMode ? (
+                        <span className="inline-flex items-center gap-0.5 rounded-sm border border-primary/40 bg-primary/10 text-primary px-1 text-[9px] leading-[14px] font-medium">
+                          {nic.isWifi ? <Wifi className="h-2.5 w-2.5" /> : null}
+                          {nic.netMode}
+                        </span>
+                      ) : null}
+                      {nic.isp ? (
+                        <span className="inline-block rounded-sm border border-border bg-muted/40 px-1 text-[9px] leading-[14px] text-muted-foreground truncate max-w-[80px]">
+                          {nic.isp}
+                        </span>
+                      ) : null}
+                      {nic.signal ? (
+                        <span className="inline-flex items-center gap-0.5 rounded-sm border border-border bg-muted/40 px-1 text-[9px] leading-[14px] text-muted-foreground">
+                          <Signal className="h-2.5 w-2.5" />
+                          {nic.signal}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="text-right">
                   <div className={`font-mono text-xs tabular-nums ${isEmpty ? "text-muted-foreground" : ""}`} style={isEmpty ? undefined : { color }}>
