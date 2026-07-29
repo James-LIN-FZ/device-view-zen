@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Network } from "lucide-react";
+import { Network, Signal, Wifi } from "lucide-react";
 import {
   Area,
   AreaChart,
