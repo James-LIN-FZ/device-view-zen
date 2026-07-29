@@ -108,11 +108,21 @@ function getPreviewBaseUrl(streamUrl: string): string | null {
   if (!streamUrl || streamUrl === "--") return null;
   try {
     const parsed = new URL(streamUrl);
-    if (parsed.protocol.toLowerCase() !== "srt:") return null;
-    const srtPort = Number(parsed.port);
-    if (!Number.isFinite(srtPort) || srtPort < 15000 || srtPort > 15099) return null;
-    const previewPort = 19000 + (srtPort - 15000);
-    return `http://${parsed.hostname}:${previewPort}/api/frame.jpeg?src=240p`;
+    const protocol = parsed.protocol.toLowerCase();
+    if (protocol === "srt:") {
+      const srtPort = Number(parsed.port);
+      if (!Number.isFinite(srtPort) || srtPort < 15000 || srtPort > 15099) return null;
+      const previewPort = 19000 + (srtPort - 15000);
+      return `http://${parsed.hostname}:${previewPort}/api/frame.jpeg?src=240p`;
+    }
+    if (protocol === "rtsp:") {
+      // rtsp://129.211.229.214:17001/main
+      const rtspPort = Number(parsed.port);
+      if (!Number.isFinite(rtspPort) || rtspPort < 17000 || rtspPort > 17099) return null;
+      const previewPort = 19000 + (rtspPort - 17000);
+      return `http://${parsed.hostname}:${previewPort}/api/frame.jpeg?src=240p_o`;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -122,11 +132,21 @@ function getWebrtcBaseUrl(streamUrl: string): string | null {
   if (!streamUrl || streamUrl === "--") return null;
   try {
     const parsed = new URL(streamUrl);
-    if (parsed.protocol.toLowerCase() !== "srt:") return null;
-    const srtPort = Number(parsed.port);
-    if (!Number.isFinite(srtPort) || srtPort < 15000 || srtPort > 15099) return null;
-    const webrtcPort = 19000 + (srtPort - 15000);
-    return `http://${parsed.hostname}:${webrtcPort}/stream.html?src=240p`;
+    const protocol = parsed.protocol.toLowerCase();
+    if (protocol === "srt:") {
+      const srtPort = Number(parsed.port);
+      if (!Number.isFinite(srtPort) || srtPort < 15000 || srtPort > 15099) return null;
+      const webrtcPort = 19000 + (srtPort - 15000);
+      return `http://${parsed.hostname}:${webrtcPort}/stream.html?src=240p`;
+    }
+    if (protocol === "rtsp:") {
+      // rtsp://129.211.229.214:17001/main
+      const rtspPort = Number(parsed.port);
+      if (!Number.isFinite(rtspPort) || rtspPort < 17000 || rtspPort > 17099) return null;
+      const webrtcPort = 19000 + (rtspPort - 17000);
+      return `http://${parsed.hostname}:${webrtcPort}/stream.html?src=240p_o`;
+    }
+    return null;
   } catch {
     return null;
   }
