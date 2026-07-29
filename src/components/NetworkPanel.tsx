@@ -118,7 +118,7 @@ function parseNetworkPayload(payload: unknown): NicRealtime[] {
       const link = asRecord(row.link) || row;
       const stats = asRecord(row.statistics) || row;
       const name = pickString(link, ["sInterface", "interface", "ifName", "iface", "name", "nic", "sName", "sNic"]) || `网卡 ${index + 1}`;
-      const type = pickString(link, ["sType", "type", "desc", "sDesc", "carrier", "operator"]) || "已连接";
+      const type = pickString(link, ["sType", "type", "desc", "sDesc", "carrier", "operator"]);
       const upNum = pickNumber(stats, ["iTxSpeed", "tx", "upload", "iUp", "iTx", "txKbps", "txMbps", "fTx", "send", "out"]);
       const downNum = pickNumber(stats, ["iRxSpeed", "rx", "download", "iDown", "iRx", "rxKbps", "rxMbps", "fRx", "recv", "in"]);
       const upText = parseSpeedTextToKbps(stats.sTxSpeed);
@@ -245,7 +245,7 @@ export function NetworkPanel({ serialNo, online, payload }: { serialNo: string; 
                         </span>
                       ) : null}
                       {nic.signal ? (
-                        <span className="inline-flex items-center gap-0.5 rounded-sm border border-border bg-muted/40 px-1 text-[9px] leading-[14px] text-muted-foreground">
+                        <span className="inline-flex items-center gap-0.5 rounded-sm border border-primary/40 bg-primary/10 text-primary px-1 text-[9px] leading-[14px] font-medium">
                           <Signal className="h-2.5 w-2.5" />
                           {nic.signal}
                         </span>
