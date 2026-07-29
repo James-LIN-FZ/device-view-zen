@@ -118,7 +118,7 @@ function parseNetworkPayload(payload: unknown): NicRealtime[] {
       const link = asRecord(row.link) || row;
       const stats = asRecord(row.statistics) || row;
       const name = pickString(link, ["sInterface", "interface", "ifName", "iface", "name", "nic", "sName", "sNic"]) || `网卡 ${index + 1}`;
-      const type = pickString(link, ["sType", "type", "desc", "sDesc", "carrier", "operator"]) || "已连接";
+      const type = pickString(link, ["sType", "type", "desc", "sDesc", "carrier", "operator"]);
       const upNum = pickNumber(stats, ["iTxSpeed", "tx", "upload", "iUp", "iTx", "txKbps", "txMbps", "fTx", "send", "out"]);
       const downNum = pickNumber(stats, ["iRxSpeed", "rx", "download", "iDown", "iRx", "rxKbps", "rxMbps", "fRx", "recv", "in"]);
       const upText = parseSpeedTextToKbps(stats.sTxSpeed);
