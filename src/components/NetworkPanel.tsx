@@ -225,12 +225,33 @@ export function NetworkPanel({ serialNo, online, payload }: { serialNo: string; 
               key={`${nic.name}-${i}`}
               className="rounded-md border border-border bg-card/40 px-1 py-1 flex flex-col min-h-0"
             >
-              <div className="flex items-center justify-between mb-1 px-1">
-                <div className="min-w-0">
+              <div className="flex items-center justify-between mb-1 px-1 gap-1">
+                <div className="min-w-0 flex-1">
                   <div className={`text-xs font-semibold tracking-wide truncate ${isEmpty ? "text-muted-foreground" : ""}`}>
                     {nic.name}
                   </div>
-                  <div className={`text-[10px] truncate ${isEmpty ? "text-muted-foreground" : "text-muted-foreground"}`}>{nic.type}</div>
+                  <div className={`text-[10px] truncate text-muted-foreground`}>{nic.type}</div>
+                  {!isEmpty && nic.isWireless ? (
+                    <div className="mt-0.5 flex items-center gap-1 flex-wrap">
+                      {nic.netMode ? (
+                        <span className="inline-flex items-center gap-0.5 rounded-sm border border-primary/40 bg-primary/10 text-primary px-1 text-[9px] leading-[14px] font-medium">
+                          {nic.isWifi ? <Wifi className="h-2.5 w-2.5" /> : null}
+                          {nic.netMode}
+                        </span>
+                      ) : null}
+                      {nic.isp ? (
+                        <span className="inline-block rounded-sm border border-border bg-muted/40 px-1 text-[9px] leading-[14px] text-muted-foreground truncate max-w-[80px]">
+                          {nic.isp}
+                        </span>
+                      ) : null}
+                      {nic.signal ? (
+                        <span className="inline-flex items-center gap-0.5 rounded-sm border border-border bg-muted/40 px-1 text-[9px] leading-[14px] text-muted-foreground">
+                          <Signal className="h-2.5 w-2.5" />
+                          {nic.signal}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="text-right">
                   <div className={`font-mono text-xs tabular-nums ${isEmpty ? "text-muted-foreground" : ""}`} style={isEmpty ? undefined : { color }}>
