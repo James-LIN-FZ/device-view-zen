@@ -125,14 +125,35 @@ function parseNetworkPayload(payload: unknown): NicRealtime[] {
       const downText = parseSpeedTextToKbps(stats.sRxSpeed);
       const up = upText ?? toKbps(upNum || 0);
       const down = downText ?? toKbps(downNum || 0);
-      return { name, type, up, down };
+
+      const linkType = pickString(link, ["sType", "type"]).toLowerCase();
+      const isWifi = /^wlan/i.test(name) || linkType === "wifi" || linkType === "wlan";
+      const isEth = linkType === "ethernet" || /^eth/i.test(name);
+      const isWireless = !isEth;
+
+      const modem = asRecord(row.modem) || {};
+      const signal = pickString(modem, ["sSignal", "signal", "rssi"]);
+      const isp = pickString(modem, ["sISP", "isp", "operator", "carrier"]);
+      const modeRaw = pickString(modem, ["sMode", "mode", "netMode", "rat"]).toUpperCase();
+
+      let netMode = "";
+      if (isWifi) {
+        netMode = "Wi-Fi";
+      } else if (isWireless) {
+        if (/NR/.test(modeRaw)) netMode = /LTE/.test(modeRaw) ? "5G/4G" : "5G";
+        else if (/LTE|4G/.test(modeRaw)) netMode = "4G";
+        else if (/3G|WCDMA|HSPA/.test(modeRaw)) netMode = "3G";
+        else if (modeRaw) netMode = modeRaw;
+      }
+
+      return { name, type, up, down, isWireless, isWifi, signal, isp, netMode };
     })
     .filter((item): item is NicRealtime => item !== null);
 }
 
 function makeDisplayNics(liveNics: NicRealtime[]): NicRealtime[] {
   return Array.from({ length: DISPLAY_NIC_COUNT }, (_, i) =>
-    liveNics[i] ?? { name: "--", type: "--", up: 0, down: 0 },
+    liveNics[i] ?? { name: "--", type: "--", up: 0, down: 0, isWireless: false, isWifi: false, signal: "", isp: "", netMode: "" },
   );
 }
 
