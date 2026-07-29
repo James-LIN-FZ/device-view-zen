@@ -226,21 +226,23 @@ export function NetworkPanel({ serialNo, online, payload }: { serialNo: string; 
               className="rounded-md border border-border bg-card/40 px-1 py-1 flex flex-col min-h-0"
             >
               <div className="flex flex-col gap-0.5 mb-1 px-1">
-                <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center justify-between gap-1.5">
                   <div className={`text-xs font-semibold tracking-wide truncate ${isEmpty ? "text-muted-foreground" : ""}`}>
                     {nic.name}
                   </div>
-                  {!isEmpty && nic.isWireless && nic.netMode ? (
-                    <span className="inline-flex items-center gap-0.5 shrink-0 rounded-sm border border-primary/40 bg-primary/10 text-primary px-1 text-[9px] leading-[14px] font-medium">
-                      {nic.isWifi ? <Wifi className="h-2.5 w-2.5" /> : null}
-                      {nic.netMode}
-                    </span>
-                  ) : null}
-                  {!isEmpty && nic.isWireless && nic.isp ? (
-                    <span className="inline-block shrink-0 rounded-sm border border-border bg-muted/40 px-1 text-[9px] leading-[14px] text-muted-foreground truncate max-w-[80px]">
-                      {nic.isp}
-                    </span>
-                  ) : null}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {!isEmpty && nic.isWireless && nic.netMode ? (
+                      <span className="inline-flex items-center gap-0.5 rounded-sm border border-primary/40 bg-primary/10 text-primary px-1 text-[9px] leading-[14px] font-medium">
+                        {nic.isWifi ? <Wifi className="h-2.5 w-2.5" /> : null}
+                        {nic.netMode}
+                      </span>
+                    ) : null}
+                    {!isEmpty && nic.isWireless && nic.isp ? (
+                      <span className="inline-flex items-center gap-0.5 rounded-sm border border-primary/40 bg-primary/10 text-primary px-1 text-[9px] leading-[14px] font-medium truncate max-w-[80px]">
+                        {nic.isp}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1 min-w-0">
