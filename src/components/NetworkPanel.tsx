@@ -18,7 +18,17 @@ const POINTS = 30;
 const DISPLAY_NIC_COUNT = 8;
 
 type Sample = { t: number; up: number; down: number };
-type NicRealtime = { name: string; type: string; up: number; down: number };
+type NicRealtime = {
+  name: string;
+  type: string;
+  up: number;
+  down: number;
+  isWireless: boolean;
+  isWifi: boolean;
+  signal: string;
+  isp: string;
+  netMode: string; // "5G" | "4G" | "Wi-Fi" | ""
+};
 
 function makeInitial(): Sample[] {
   const now = Date.now();
